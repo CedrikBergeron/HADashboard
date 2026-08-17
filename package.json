@@ -1,0 +1,13 @@
+{
+  "name": "home-dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "node server/server.mjs",
+    "client": "npm --prefix angular-dashboard start",
+    "dev": "node server/dev.mjs",
+    "build": "npm --prefix angular-dashboard run build",
+    "start": "node server/server.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,120 @@
+{
+  "id": "main",
+  "name": "Maison principale",
+  "settings": {
+    "screensaverEntityId": "input_boolean.dashboard",
+    "screensaverActiveState": "on"
+  },
+  "rooms": [
+    {
+      "id": "salon",
+      "name": "Salon",
+      "floor": "main",
+      "icon": {
+        "name": "weekend",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "entree",
+      "name": "Entrée",
+      "floor": "main",
+      "icon": {
+        "name": "door_front",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "salle-a-manger",
+      "name": "Salle à Manger",
+      "floor": "main",
+      "icon": {
+        "name": "table_restaurant",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "cuisine",
+      "name": "Cuisine",
+      "floor": "main",
+      "icon": {
+        "name": "kitchen",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "salle-de-bain-main",
+      "name": "Salle de bain",
+      "floor": "main",
+      "icon": {
+        "name": "bathtub",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "chambre-nicolas",
+      "name": "Chambre Nicolas",
+      "floor": "main",
+      "icon": {
+        "name": "bed",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "passage",
+      "name": "Passage",
+      "floor": "basement",
+      "icon": {
+        "name": "conversion_path",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "buanderie",
+      "name": "Buanderie",
+      "floor": "basement",
+      "icon": {
+        "name": "local_laundry_service",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "salle-de-bain-basement",
+      "name": "Salle de bain",
+      "floor": "basement",
+      "icon": {
+        "name": "shower",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "chambre-alexis",
+      "name": "Chambre Alexis",
+      "floor": "basement",
+      "icon": {
+        "name": "bed",
+        "style": "outlined",
+        "filled": false
+      }
+    },
+    {
+      "id": "chambre-cedrik",
+      "name": "Chambre Cédrik",
+      "floor": "basement",
+      "icon": {
+        "name": "bedroom_parent",
+        "style": "outlined",
+        "filled": false
+      }
+    }
+  ]
+}
