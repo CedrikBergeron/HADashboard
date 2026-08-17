@@ -1,10 +1,11 @@
 import { createServer } from 'node:http';
-import { readFile, writeFile, rename, mkdir, copyFile, stat } from 'node:fs/promises';
+import { readFile, writeFile, rename, mkdir, copyFile, stat, readdir } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { randomBytes, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import WebSocket, { WebSocketServer } from 'ws';
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)));
 const dataDir = join(root, 'data');
@@ -48,6 +49,28 @@ async function saveAdminPin(pin) {
   await rename(temporary, target);
 }
 
+async function hassSecret() {
+  try { return JSON.parse(await readFile(join(secretsDir, 'home-assistant.json'), 'utf8')); } catch {
+    return process.env.HASS_URL && process.env.HASS_TOKEN ? { url: process.env.HASS_URL, token: process.env.HASS_TOKEN } : null;
+  }
+}
+
+async function saveHassSecret(url, token) {
+  const target = join(secretsDir, 'home-assistant.json');
+  const temporary = `${target}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify({ url: url.replace(/\/$/, ''), token, updatedAt: new Date().toISOString() }), { mode: 0o600 });
+  await rename(temporary, target);
+}
+
+async function testHomeAssistant(config = null) {
+  const secret = config || await hassSecret();
+  if (!secret) return { configured: false, connected: false };
+  try {
+    const response = await fetch(`${secret.url.replace(/\/$/, '')}/api/`, { headers: { authorization: `Bearer ${secret.token}` }, signal: AbortSignal.timeout(5000) });
+    return { configured: true, connected: response.ok, url: secret.url };
+  } catch { return { configured: true, connected: false, url: secret.url }; }
+}
+
 function json(res, status, value, extra = {}) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra });
   res.end(JSON.stringify(value));
@@ -84,8 +107,18 @@ function authorized(req) {
 
 function validHome(value) {
   return value && typeof value === 'object' && Array.isArray(value.rooms) && value.rooms.every((room) =>
-    room && typeof room.id === 'string' && typeof room.name === 'string' && ['main', 'basement'].includes(room.floor)
+    room && typeof room.id === 'string' && typeof room.name === 'string' && typeof room.floor === 'string' && /^[a-z0-9-]+$/.test(room.floor)
   );
+}
+
+async function listBackups(homeId = 'main') {
+  const files = await readdir(backupsDir);
+  const matching = files.filter((file) => file.startsWith(`${homeId}-`) && file.endsWith('.json'));
+  const rows = await Promise.all(matching.map(async (file) => {
+    const info = await stat(join(backupsDir, file));
+    return { id: file, createdAt: info.mtime.toISOString(), size: info.size };
+  }));
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50);
 }
 
 async function readHome(id = 'main') {
@@ -124,6 +157,23 @@ async function iconCatalog() {
 }
 
 async function api(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/home-assistant/status') return json(res, 200, await testHomeAssistant());
+  if (req.method === 'PUT' && url.pathname === '/api/home-assistant/config') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const value = await body(req);
+    const urlValue = String(value.url || '').replace(/\/$/, '');
+    const token = String(value.token || '');
+    if (!/^https?:\/\//.test(urlValue) || token.length < 20) return json(res, 400, { error: 'Adresse ou jeton invalide' });
+    const status = await testHomeAssistant({ url: urlValue, token });
+    if (!status.connected) return json(res, 400, { error: 'Connexion Home Assistant refusée' });
+    await saveHassSecret(urlValue, token);
+    return json(res, 200, status);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/system/health') {
+    let homeReadable = false;
+    try { await readHome('main'); homeReadable = true; } catch {}
+    return json(res, 200, { status: homeReadable ? 'ok' : 'degraded', uptime: Math.round(process.uptime()), node: process.version, homeReadable, sessions: sessions.size, now: new Date().toISOString() });
+  }
   if (req.method === 'POST' && url.pathname === '/api/admin/unlock') {
     const value = await body(req);
     if (!await verifyAdminPin(value.pin)) return json(res, 401, { error: 'NIP incorrect' });
@@ -140,6 +190,20 @@ async function api(req, res, url) {
     return json(res, 200, { saved: true });
   }
   if (req.method === 'GET' && url.pathname === '/api/icons') return json(res, 200, await iconCatalog());
+  if (req.method === 'GET' && url.pathname === '/api/backups') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    return json(res, 200, { backups: await listBackups('main') });
+  }
+  const restoreMatch = url.pathname.match(/^\/api\/backups\/([a-zA-Z0-9_.-]+)\/restore$/);
+  if (restoreMatch && req.method === 'POST') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const backupId = restoreMatch[1];
+    if (!backupId.startsWith('main-') || !backupId.endsWith('.json')) return json(res, 400, { error: 'Sauvegarde invalide' });
+    const restored = JSON.parse(await readFile(join(backupsDir, backupId), 'utf8'));
+    if (!validHome(restored)) return json(res, 400, { error: 'Sauvegarde corrompue' });
+    await saveHome('main', restored);
+    return json(res, 200, { restored: true });
+  }
   const backgroundMatch = url.pathname.match(/^\/api\/homes\/([a-z0-9-]+)\/rooms\/([a-z0-9-]+)\/background$/);
   if (backgroundMatch && req.method === 'POST') {
     if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
@@ -199,3 +263,30 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => console.log(`Dashboard server: http://localhost:${port}`));
+
+const websocketServer = new WebSocketServer({ noServer: true });
+server.on('upgrade', async (request, socket, head) => {
+  const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+  if (url.pathname !== '/api/home-assistant/websocket') return socket.destroy();
+  const secret = await hassSecret();
+  if (!secret) return socket.destroy();
+  websocketServer.handleUpgrade(request, socket, head, (client) => {
+    const upstreamUrl = secret.url.replace(/^http/, 'ws') + '/api/websocket';
+    const upstream = new WebSocket(upstreamUrl);
+    let authenticated = false;
+    upstream.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type === 'auth_required') { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(message)); return; }
+        if (message.type === 'auth_ok') authenticated = true;
+      } catch {}
+      if (client.readyState === WebSocket.OPEN) client.send(data.toString());
+    });
+    client.on('message', (data) => {
+      try { const message = JSON.parse(data.toString()); if (message.type === 'auth' && !authenticated) { upstream.send(JSON.stringify({ type: 'auth', access_token: secret.token })); return; } } catch {}
+      if (upstream.readyState === WebSocket.OPEN) upstream.send(data.toString());
+    });
+    const close = () => { if (client.readyState < WebSocket.CLOSING) client.close(); if (upstream.readyState < WebSocket.CLOSING) upstream.close(); };
+    client.on('close', close); upstream.on('close', close); upstream.on('error', close);
+  });
+});

@@ -1,11 +1,65 @@
 {
   "id": "main",
   "name": "Maison principale",
+  "floors": [
+    {
+      "id": "main",
+      "name": "Rez-de-chaussée",
+      "icon": "stairs"
+    },
+    {
+      "id": "basement",
+      "name": "Sous-sol",
+      "icon": "stairs_2"
+    }
+  ],
   "settings": {
     "screensaverEntityId": "input_boolean.dashboard",
-    "screensaverActiveState": "on"
+    "screensaverActiveState": "on",
+    "fontScale": 1,
+    "glassOpacity": 1,
+    "reducedMotion": false,
+    "clock24h": true,
+    "tabletMode": false,
+    "inactivityMinutes": 5
   },
   "rooms": [
+    {
+      "id": "entree",
+      "name": "Entrée",
+      "floor": "main",
+      "icon": {
+        "name": "door_front",
+        "style": "outlined",
+        "filled": false
+      },
+      "controls": [
+        {
+          "id": "lock.aqara_smart_lock_u100",
+          "label": "Porte Avant",
+          "entityId": "lock.aqara_smart_lock_u100",
+          "icon": "lock"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.neviweb130_climate_th1143wf_3"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,6;"
+      },
+      "background": {
+        "url": "assets/home.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
+      }
+    },
     {
       "id": "salon",
       "name": "Salon",
@@ -40,42 +94,6 @@
       },
       "background": {
         "url": "assets/salon.jpg",
-        "positionX": 50,
-        "positionY": 50,
-        "brightness": 0.72,
-        "saturation": 0.9,
-        "contrast": 1.02,
-        "overlay": 0.26
-      }
-    },
-    {
-      "id": "entree",
-      "name": "Entrée",
-      "floor": "main",
-      "icon": {
-        "name": "door_front",
-        "style": "outlined",
-        "filled": false
-      },
-      "controls": [
-        {
-          "id": "lock.aqara_smart_lock_u100",
-          "label": "Porte Avant",
-          "entityId": "lock.aqara_smart_lock_u100",
-          "icon": "lock"
-        }
-      ],
-      "climate": {
-        "enabled": true,
-        "entityId": "climate.neviweb130_climate_th1143wf_3"
-      },
-      "vacuum": {
-        "enabled": true,
-        "entityId": "vacuum.t50_pro_omni",
-        "roomParameter": "1,6;"
-      },
-      "background": {
-        "url": "assets/home.jpg",
         "positionX": 50,
         "positionY": 50,
         "brightness": 0.72,

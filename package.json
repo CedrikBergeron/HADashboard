@@ -9,5 +9,10 @@
     "build": "npm --prefix angular-dashboard run build",
     "start": "node server/server.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
 }
