@@ -14,6 +14,38 @@
         "name": "weekend",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "media_player.salon",
+          "label": "Apple TV",
+          "entityId": "media_player.salon",
+          "icon": "tv_gen"
+        },
+        {
+          "id": "light.lampe_sur_pied",
+          "label": "Lampe sur Pied",
+          "entityId": "light.lampe_sur_pied",
+          "icon": "floor_lamp"
+        }
+      ],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,5;"
+      },
+      "background": {
+        "url": "assets/salon.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -24,6 +56,32 @@
         "name": "door_front",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "lock.aqara_smart_lock_u100",
+          "label": "Porte Avant",
+          "entityId": "lock.aqara_smart_lock_u100",
+          "icon": "lock"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.neviweb130_climate_th1143wf_3"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,6;"
+      },
+      "background": {
+        "url": "assets/home.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -34,6 +92,38 @@
         "name": "table_restaurant",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.salle_a_manger",
+          "label": "Luminaire",
+          "entityId": "light.salle_a_manger",
+          "icon": "light"
+        },
+        {
+          "id": "cover.curtain",
+          "label": "Rideaux",
+          "entityId": "cover.curtain",
+          "icon": "curtains_closed"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.salle_a_manger"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,4;"
+      },
+      "background": {
+        "url": "assets/sam.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -44,6 +134,38 @@
         "name": "kitchen",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.cuisine",
+          "label": "Luminaire",
+          "entityId": "light.cuisine",
+          "icon": "light"
+        },
+        {
+          "id": "light.comptoir",
+          "label": "Comptoir",
+          "entityId": "light.comptoir",
+          "icon": "fluorescent"
+        }
+      ],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,7;"
+      },
+      "background": {
+        "url": "assets/cuisine.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -54,6 +176,38 @@
         "name": "bathtub",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.salle_de_bain",
+          "label": "Mirroir",
+          "entityId": "light.salle_de_bain",
+          "icon": "bathroom"
+        },
+        {
+          "id": "light.entree",
+          "label": "Luminaire",
+          "entityId": "light.entree",
+          "icon": "light"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.neviweb130_climate_th1143wf"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,2;"
+      },
+      "background": {
+        "url": "assets/salle-de-bain-main.png",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -64,6 +218,38 @@
         "name": "bed",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.nicolas_blanc",
+          "label": "Lumières Blanche",
+          "entityId": "light.nicolas_blanc",
+          "icon": "backlight_low"
+        },
+        {
+          "id": "light.nicolas_couleur",
+          "label": "Lumières Couleur",
+          "entityId": "light.nicolas_couleur",
+          "icon": "fluorescent"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.neviweb130_climate_th1143wf_2"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.t50_pro_omni",
+        "roomParameter": "1,3;"
+      },
+      "background": {
+        "url": "assets/chambre-nicolas.png",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -74,6 +260,32 @@
         "name": "conversion_path",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.sous_sol",
+          "label": "Encastrées",
+          "entityId": "light.sous_sol",
+          "icon": "fluorescent"
+        }
+      ],
+      "climate": {
+        "enabled": true,
+        "entityId": "climate.neviweb130_climate_th1400wf"
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.michelle",
+        "roomParameter": ""
+      },
+      "background": {
+        "url": "assets/ss.jpg",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -84,6 +296,16 @@
         "name": "local_laundry_service",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.michelle",
+        "roomParameter": ""
       }
     },
     {
@@ -94,6 +316,38 @@
         "name": "shower",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.ilot",
+          "label": "Encastrées",
+          "entityId": "light.ilot",
+          "icon": "fluorescent"
+        },
+        {
+          "id": "light.salle_de_bain_basement_douche",
+          "label": "Douche",
+          "entityId": "light.salle_de_bain_basement_douche",
+          "icon": "fluorescent"
+        }
+      ],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.michelle",
+        "roomParameter": ""
+      },
+      "background": {
+        "url": "assets/salle-de-bain-basement.png",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -104,6 +358,25 @@
         "name": "bed",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.michelle",
+        "roomParameter": ""
+      },
+      "background": {
+        "url": "assets/chambre-alexis.png",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     },
     {
@@ -114,6 +387,44 @@
         "name": "bedroom_parent",
         "style": "outlined",
         "filled": false
+      },
+      "controls": [
+        {
+          "id": "light.encastrees",
+          "label": "Encastrées",
+          "entityId": "light.encastrees",
+          "icon": "fluorescent"
+        },
+        {
+          "id": "light.lampe_bureau_ced",
+          "label": "Lampe bureau",
+          "entityId": "light.lampe_bureau_ced",
+          "icon": "light"
+        },
+        {
+          "id": "light.lampes_chevet",
+          "label": "Lampes chevet",
+          "entityId": "light.lampes_chevet",
+          "icon": "light"
+        }
+      ],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": true,
+        "entityId": "vacuum.michelle",
+        "roomParameter": ""
+      },
+      "background": {
+        "url": "assets/chambre-cedrik.png",
+        "positionX": 50,
+        "positionY": 50,
+        "brightness": 0.72,
+        "saturation": 0.9,
+        "contrast": 1.02,
+        "overlay": 0.26
       }
     }
   ]
