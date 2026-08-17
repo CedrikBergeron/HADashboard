@@ -16,6 +16,38 @@ h1 { margin-top: 4px; font-size: 1.45rem; }
 .admin-status { display: flex; align-items: center; gap: 8px; padding: 10px; color: #717a84; font-size: .72rem; }
 .admin-status span { width: 7px; height: 7px; border-radius: 50%; background: #69d69c; box-shadow: 0 0 12px rgba(105,214,156,.55); }
 .admin-content { min-width: 0; overflow: auto; padding: 30px; background: #17191d; }
+.admin-content,
+.icon-grid,
+.entity-results,
+.floor-editor-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.2) transparent;
+  scrollbar-gutter: stable;
+}
+.admin-content::-webkit-scrollbar,
+.icon-grid::-webkit-scrollbar,
+.entity-results::-webkit-scrollbar,
+.floor-editor-list::-webkit-scrollbar { width: 7px; height: 7px; }
+.admin-content::-webkit-scrollbar-track,
+.icon-grid::-webkit-scrollbar-track,
+.entity-results::-webkit-scrollbar-track,
+.floor-editor-list::-webkit-scrollbar-track { background: transparent; }
+.admin-content::-webkit-scrollbar-thumb,
+.icon-grid::-webkit-scrollbar-thumb,
+.entity-results::-webkit-scrollbar-thumb,
+.floor-editor-list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(255,255,255,.2); background-clip: padding-box; }
+.admin-content::-webkit-scrollbar-thumb:hover,
+.icon-grid::-webkit-scrollbar-thumb:hover,
+.entity-results::-webkit-scrollbar-thumb:hover,
+.floor-editor-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.34); background-clip: padding-box; }
+:host-context(.tablet-mode) .admin-content,
+:host-context(.tablet-mode) .icon-grid,
+:host-context(.tablet-mode) .entity-results,
+:host-context(.tablet-mode) .floor-editor-list { scrollbar-width: none; scrollbar-gutter: auto; }
+:host-context(.tablet-mode) .admin-content::-webkit-scrollbar,
+:host-context(.tablet-mode) .icon-grid::-webkit-scrollbar,
+:host-context(.tablet-mode) .entity-results::-webkit-scrollbar,
+:host-context(.tablet-mode) .floor-editor-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .content-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .content-heading h2 { font-size: 1.35rem; }
 .content-heading p { margin-top: 7px; color: #8f98a3; font-size: .88rem; }
