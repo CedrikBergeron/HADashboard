@@ -21,7 +21,7 @@
     "reducedMotion": false,
     "clock24h": true,
     "tabletMode": false,
-    "inactivityMinutes": 5
+    "inactivityMinutes": 1
   },
   "rooms": [
     {
