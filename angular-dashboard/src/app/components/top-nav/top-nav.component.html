@@ -1,0 +1,54 @@
+<header class="topbar">
+  <nav class="nav" aria-label="Navigation principale">
+    <button
+      type="button"
+      class="temperature"
+      [class.is-holding]="clockPressActive"
+      (pointerdown)="startClockLongPress($event)"
+      (pointerup)="cancelClockLongPress()"
+      (pointercancel)="cancelClockLongPress()"
+      (pointerleave)="cancelClockLongPress()"
+      (contextmenu)="$event.preventDefault()"
+      aria-label="Heure actuelle">{{ time }}</button>
+
+    <div class="menu-wrapper">
+      @for (item of items; track item.label) {
+      @if (showButtons && item.floor === currentFloor) {
+      <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)" @fadeInOut>
+        <span>{{ item.label }}</span>
+      </button>
+      }
+      }
+    </div>
+
+    <div class="action-cluster">
+      @if (actionChip) {
+        <button
+          type="button"
+          class="action-chip"
+          [class.active]="actionChip.active"
+          (click)="onActionChipClick()">
+          <span class="action-chip-icon" aria-hidden="true">
+            <svg viewBox="0 0 64 64" class="vacuum-pill-icon" focusable="false">
+              <ellipse cx="32" cy="24" rx="20" ry="8" />
+              <path d="M12 24v12c0 4.4 9 8 20 8s20-3.6 20-8V24" />
+              <ellipse cx="32" cy="22" rx="6.5" ry="2.8" />
+              <circle cx="23" cy="28" r="1.6" />
+              <circle cx="32" cy="29.5" r="1.6" />
+              <circle cx="41" cy="28" r="1.6" />
+              <path d="M32 44 22 52" />
+              <path d="M32 44 42 52" />
+            </svg>
+          </span>
+        </button>
+      }
+      @if (showButtons) {
+        <button type="button" class="floor-badge" (click)="toggleFloor()" aria-label="Changer d'étage" @fadeInOut>
+          <span class="material-symbols-outlined floor-badge-icon">stairs_2</span>
+          <span class="floor-badge-label">{{ currentFloorLabel }}</span>
+          <span class="material-symbols-outlined floor-badge-arrow">{{ currentFloorArrow }}</span>
+        </button>
+      }
+    </div>
+  </nav>
+</header>

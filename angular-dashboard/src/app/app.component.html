@@ -1,0 +1,181 @@
+<div
+  class="page"
+  [class.reduced-motion]="dashboardSettings.reducedMotion"
+  [class.tablet-mode]="dashboardSettings.tabletMode"
+  [style.--glass-opacity]="dashboardSettings.glassOpacity"
+  [class.is-screensaver]="screensaverActive">
+  @for (background of roomBackgrounds; track background.roomValue) {
+    <img
+      class="bg-image"
+      [src]="background.src"
+      [style.object-position]="background.positionX + '% ' + background.positionY + '%'"
+      [style.filter]="'brightness(' + background.brightness + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"
+      [style.opacity]="activeRoomValue === background.roomValue ? 1 : 0"
+      alt="" />
+  }
+  <div class="overlay" [style.background]="'rgba(0, 0, 0, ' + activeBackgroundOverlay + ')'" ></div>
+
+  <app-top-nav
+    [items]="navItems"
+    [floors]="dashboardFloors"
+    [time]="now"
+    [actionChip]="vacuumActionChip"
+    (clockLongPress)="onClockLongPress()"
+    (itemClick)="onNavClick($event)"
+    (actionChipClick)="onVacuumChipClick()">
+  </app-top-nav>
+
+  @if (currentRoomClimate) {
+    <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible">
+      <button type="button" class="hero-climate" (click)="toggleClimatePopout()">
+        <div class="hero-climate-main">
+          <span class="material-symbols-outlined hero-climate-icon">device_thermostat</span>
+          <div class="hero-climate-copy">
+            <div class="hero-climate-temp">
+              {{ currentRoomClimate.currentTemperature !== undefined ? currentRoomClimate.currentTemperature.toFixed(1) : '--' }}°
+            </div>
+            <div class="hero-climate-meta">
+              Cible {{ currentRoomClimate.targetTemperature !== undefined ? currentRoomClimate.targetTemperature.toFixed(1) : '--' }}°
+              · {{ currentRoomClimate.status }}
+            </div>
+          </div>
+        </div>
+      </button>
+
+      @if (isClimatePopoutVisible) {
+        <section class="hero-climate-popout" [class.is-open]="climatePopoutOpen" [class.is-closing]="climatePopoutClosing" aria-label="Réglage du thermostat">
+          <div class="hero-climate-dial">
+            <svg
+              class="hero-climate-dial-svg"
+              viewBox="0 0 240 190"
+              (pointerdown)="onClimateDialPointerDown($event)"
+              (pointermove)="onClimateDialPointerMove($event)"
+              (pointerup)="onClimateDialPointerUp($event)"
+              (pointercancel)="onClimateDialPointerUp($event)">
+              <defs>
+                <linearGradient id="climateArcGradient" x1="32" y1="118" x2="208" y2="60" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#58A8FF" />
+                  <stop offset="42%" stop-color="#86C4FF" />
+                  <stop offset="68%" stop-color="#F4A56E" />
+                  <stop offset="100%" stop-color="#FFBF80" />
+                </linearGradient>
+              </defs>
+
+              <path class="hero-climate-arc hero-climate-arc-bg" [attr.d]="climateDialPath" pathLength="100"></path>
+              <path
+                class="hero-climate-arc hero-climate-arc-fill"
+                [attr.d]="climateDialPath"
+                pathLength="100"
+                [attr.stroke-dasharray]="climateArcProgress + ' 100'"></path>
+              <circle class="hero-climate-current-dot-glow" [attr.cx]="climateCurrentX" [attr.cy]="climateCurrentY" r="8"></circle>
+              <circle class="hero-climate-current-dot" [attr.cx]="climateCurrentX" [attr.cy]="climateCurrentY" r="4.5"></circle>
+              <circle class="hero-climate-thumb-glow" [attr.cx]="climateDialThumbX" [attr.cy]="climateDialThumbY" r="18"></circle>
+              <circle class="hero-climate-thumb" [attr.cx]="climateDialThumbX" [attr.cy]="climateDialThumbY" r="13"></circle>
+            </svg>
+            <div class="hero-climate-dial-center">
+              <div class="hero-climate-dial-value">
+                {{ currentRoomClimate.targetTemperature !== undefined ? currentRoomClimate.targetTemperature.toFixed(1) : '--' }}°
+              </div>
+              <div class="hero-climate-dial-subvalue">
+                Actuelle {{ currentRoomClimate.currentTemperature !== undefined ? currentRoomClimate.currentTemperature.toFixed(1) : '--' }}°
+              </div>
+              <div class="hero-climate-dial-status">{{ currentRoomClimate.status }}</div>
+            </div>
+          </div>
+        </section>
+      }
+    </div>
+  }
+
+  <app-bottom-control-bar
+    class="bottom-control-host"
+    [class.is-hidden]="!controlsVisible"
+    [items]="activeControls"
+    (itemClick)="onControlClick($event)"
+    (itemLongPress)="onControlLongPress($event)"
+    (sliderChange)="onSliderChange($event)">
+  </app-bottom-control-bar>
+
+  @if (adminUnlockOpen) {
+    <div class="admin-unlock-backdrop" (click)="closeAdmin()">
+      <form class="admin-unlock" (click)="$event.stopPropagation()" (submit)="$event.preventDefault(); unlockAdmin()">
+        <div class="admin-unlock-icon"><span class="material-symbols-outlined">lock</span></div>
+        <h2>Accès administrateur</h2>
+        <p>Entrez votre NIP pour continuer.</p>
+        <input type="password" inputmode="numeric" maxlength="8" [value]="adminPinValue" (input)="onAdminPinInput($event)" autofocus aria-label="NIP administrateur">
+        @if (adminPinError) { <span class="admin-pin-error">{{ adminPinError }}</span> }
+        <div class="admin-unlock-actions"><button type="button" (click)="closeAdmin()">Annuler</button><button type="submit">Déverrouiller</button></div>
+      </form>
+    </div>
+  }
+
+  @if (adminPanelOpen) {
+    <app-admin-panel [rooms]="adminRoomsForEditor" [floors]="dashboardFloors" [entities]="adminEntityOptions" [settings]="dashboardSettings" (close)="closeAdmin()" (save)="saveAdminRooms($event)"></app-admin-panel>
+    @if (adminSaveError) { <div class="admin-save-error">{{ adminSaveError }}</div> }
+  }
+  @if (hassSetupRequired && !hassNoticeDismissed && !adminUnlockOpen && !adminPanelOpen) { <div class="hass-notice"><span class="material-symbols-outlined">cloud_off</span><div><strong>Home Assistant déconnecté</strong><small>Maintenez l’heure pour mettre à jour la connexion.</small></div><button type="button" (click)="hassNoticeDismissed = true"><span class="material-symbols-outlined">close</span></button></div> }
+
+  @if (isVacuumSheetVisible || isClimatePopoutVisible) {
+    <button
+      type="button"
+      class="sheet-backdrop"
+      [class.is-closing]="!vacuumSheetOpen && !climatePopoutOpen && (vacuumSheetClosing || climatePopoutClosing)"
+      (click)="closeVacuumSheet(); closeClimatePopout()"
+      [attr.aria-label]="vacuumSheetOpen ? 'Fermer le menu aspirateur' : 'Fermer le contrôle du thermostat'"></button>
+  }
+
+  @if (isVacuumSheetVisible && vacuumControl) {
+
+    <section class="vacuum-sheet" [class.is-closing]="vacuumSheetClosing" aria-label="Actions aspirateur">
+      <div class="vacuum-sheet-indicator" [class.is-cleaning]="vacuumIndicatorState === 'cleaning'" [class.is-paused]="vacuumIndicatorState === 'paused'" [class.is-docked]="vacuumIndicatorState === 'docked'" [attr.aria-label]="vacuumStatusLabel">
+        @switch (vacuumIndicatorState) {
+          @case ('cleaning') {
+            <svg viewBox="0 0 24 24" class="vacuum-indicator-icon" aria-hidden="true">
+              <path d="M12 4.5a7.5 7.5 0 1 0 7.5 7.5" />
+              <path d="M16.6 4.9h2.9v2.9" />
+            </svg>
+          }
+          @case ('paused') {
+            <svg viewBox="0 0 24 24" class="vacuum-indicator-icon" aria-hidden="true">
+              <rect x="7" y="5.5" width="3.2" height="13" rx="1.6" />
+              <rect x="13.8" y="5.5" width="3.2" height="13" rx="1.6" />
+            </svg>
+          }
+          @default {
+            <svg viewBox="0 0 24 24" class="vacuum-indicator-icon" aria-hidden="true">
+              <path d="M6 12.5h12" />
+              <path d="M8 15.5h8" />
+              <path d="M9.2 9.5 12 6.5l2.8 3" />
+            </svg>
+          }
+        }
+      </div>
+      <div class="sheet-kicker">Aspirateur</div>
+      <div class="sheet-status">{{ vacuumStatusLabel }}</div>
+
+      <div class="sheet-actions">
+        <button type="button" class="sheet-action sheet-action-primary" [disabled]="!canStartVacuum" (click)="startVacuum()">
+          Cette pièce
+        </button>
+        <button
+          type="button"
+          class="sheet-action"
+          [disabled]="!canStartVacuumForFloor"
+          (click)="startVacuumForFloor()">
+          Tout l'étage
+        </button>
+        <button type="button" class="sheet-action" [disabled]="!canPauseVacuum" (click)="pauseVacuum()">
+          Pause
+        </button>
+        <button type="button" class="sheet-action" [disabled]="!canDockVacuum" (click)="dockVacuum()">
+          Retour à la base
+        </button>
+      </div>
+
+      <div class="sheet-hint">
+        Par défaut, le départ cible <strong>{{ roomName }}</strong>. Vous pouvez aussi lancer le nettoyage complet de
+        <strong>{{ currentFloorLabel }}</strong>.
+      </div>
+    </section>
+  }
+</div>

@@ -1,0 +1,150 @@
+<div class="admin-shell" role="dialog" aria-modal="true" aria-label="Administration du tableau de bord">
+  <header class="admin-header">
+    <div>
+      <span class="eyebrow">Maison principale</span>
+      <h1>Administration</h1>
+    </div>
+    <button type="button" class="icon-button" (click)="close.emit()" aria-label="Fermer l'administration">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </header>
+
+  <div class="admin-layout">
+    <nav class="admin-nav" aria-label="Sections d'administration">
+      <button type="button" [class.active]="activeSection === 'rooms'" (click)="activeSection = 'rooms'">
+        <span class="material-symbols-outlined">home_work</span><span>Pièces et étages</span>
+      </button>
+      <button type="button" [class.active]="activeSection === 'connection'" (click)="openConnection()">
+        <span class="material-symbols-outlined">hub</span><span>Home Assistant</span>
+      </button>
+      <button type="button" [class.active]="activeSection === 'security'" (click)="activeSection = 'security'">
+        <span class="material-symbols-outlined">admin_panel_settings</span><span>Sécurité et veille</span>
+      </button>
+      <button type="button" [class.active]="activeSection === 'system'" (click)="openSystem()">
+        <span class="material-symbols-outlined">monitor_heart</span><span>Système et sauvegardes</span>
+      </button>
+      <button type="button" [class.active]="activeSection === 'appearance'" (click)="activeSection = 'appearance'">
+        <span class="material-symbols-outlined">palette</span><span>Apparence et tablette</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <div class="admin-status"><span></span> Mode administrateur</div>
+    </nav>
+
+    <main class="admin-content">
+      @if (activeSection === 'rooms') {
+        <div class="content-heading">
+          <div><h2>Pièces et étages</h2><p>Organisez ce qui apparaît dans la navigation de la maison.</p></div>
+          <div class="heading-actions"><button type="button" class="secondary-button" (click)="floorManagerOpen = true"><span class="material-symbols-outlined">layers</span>Gérer les étages</button><button type="button" class="primary-button" (click)="addRoom()"><span class="material-symbols-outlined">add</span>Ajouter une pièce</button></div>
+        </div>
+
+        <div class="room-workspace">
+          <section class="room-list-card">
+            @for (floor of floorGroups; track floor.id) { <h3 [class.floor-title]="$index > 0"><span class="floor-name"><i class="material-symbols-outlined">{{ floor.icon }}</i>{{ floor.name }}</span><span>{{ floor.rooms.length }}</span></h3>@for (room of floor.rooms; track trackRoom($index, room)) { <button type="button" class="room-row" draggable="true" [class.dragging]="draggedRoomId === room.id" (dragstart)="startRoomDrag(room.id)" (dragover)="$event.preventDefault()" (drop)="dropRoom(room.id)" [class.selected]="room.id === selectedRoomId" (click)="selectedRoomId = room.id"><span class="material-symbols-outlined">{{ room.icon }}</span><span>{{ room.name }}</span><span class="material-symbols-outlined chevron">chevron_right</span></button> } }
+          </section>
+
+          <section class="editor-card">
+            @if (selectedRoom; as room) {
+              <div class="editor-title"><div class="room-icon"><span class="material-symbols-outlined">{{ room.icon }}</span></div><div><span>Modifier la pièce</span><h3>{{ room.name }}</h3></div></div>
+              <div class="room-live-preview" [style.background-image]="room.background ? 'linear-gradient(rgba(0,0,0,' + room.background.overlay + '),rgba(0,0,0,' + room.background.overlay + ')),url(' + backgroundPreview(room.background.url) + ')' : ''" [style.background-position]="(room.background?.positionX || 50) + '% ' + (room.background?.positionY || 50) + '%'"><div class="preview-nav"><span>{{ room.name }}</span><small>Aperçu</small></div>@if (room.climate?.enabled) { <div class="preview-climate"><span class="material-symbols-outlined">thermostat</span>Climat</div> }<div class="preview-controls">@for (control of room.controls || []; track control.id) { <span><i class="material-symbols-outlined">{{ control.icon }}</i>{{ control.label }}</span> }</div></div>
+              <label>Nom de la pièce<input [(ngModel)]="room.name" (blur)="updateRoomId()" (ngModelChange)="saveState = 'idle'" autocomplete="off"></label>
+              <label>Étage<select [(ngModel)]="room.floor" (ngModelChange)="saveState = 'idle'">@for (floor of draftFloors; track floor.id) { <option [value]="floor.id">{{ floor.name }}</option> }</select></label>
+              <label>Icône Material Symbols<button type="button" class="icon-selector" (click)="openRoomIconPicker()"><span [class]="'material-symbols-' + room.iconStyle" [class.fill-icon]="room.iconFilled">{{ room.icon }}</span><span>{{ room.icon.replaceAll('_', ' ') }}</span><span class="material-symbols-outlined">expand_more</span></button></label>
+              <div class="icon-options"><label>Style<select [(ngModel)]="room.iconStyle" (ngModelChange)="saveState = 'idle'"><option value="outlined">Outlined</option><option value="rounded">Rounded</option><option value="sharp">Sharp</option></select></label><label class="fill-toggle"><input type="checkbox" [(ngModel)]="room.iconFilled" (ngModelChange)="saveState = 'idle'"><span>Icône remplie</span></label></div>
+              <div class="background-editor">
+                <div class="equipment-heading"><div><h4>Image d’arrière-plan</h4><p>Photo et apparence de cette pièce.</p></div><label class="upload-button"><input type="file" accept="image/jpeg,image/png,image/webp" (change)="onBackgroundFile($event)"><span class="material-symbols-outlined">upload</span>{{ backgroundUploading ? 'Envoi…' : 'Choisir' }}</label></div>
+                @if (room.background; as background) {
+                  <div class="background-preview" [style.background-image]="'linear-gradient(rgba(0,0,0,' + background.overlay + '),rgba(0,0,0,' + background.overlay + ')),url(' + backgroundPreview(background.url) + ')'" [style.background-position]="background.positionX + '% ' + background.positionY + '%'" [style.filter]="'brightness(' + background.brightness + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"> <span>{{ room.name }}</span> </div>
+                  <div class="background-controls"><label>Position horizontale<input type="range" min="0" max="100" step="1" [(ngModel)]="background.positionX" (ngModelChange)="saveState = 'idle'"></label><label>Position verticale<input type="range" min="0" max="100" step="1" [(ngModel)]="background.positionY" (ngModelChange)="saveState = 'idle'"></label><label>Luminosité<input type="range" min="0.3" max="1.2" step="0.01" [(ngModel)]="background.brightness" (ngModelChange)="saveState = 'idle'"></label><label>Saturation<input type="range" min="0" max="1.5" step="0.01" [(ngModel)]="background.saturation" (ngModelChange)="saveState = 'idle'"></label><label>Contraste<input type="range" min="0.5" max="1.5" step="0.01" [(ngModel)]="background.contrast" (ngModelChange)="saveState = 'idle'"></label><label>Voile sombre<input type="range" min="0" max="0.75" step="0.01" [(ngModel)]="background.overlay" (ngModelChange)="saveState = 'idle'"></label></div>
+                } @else { <div class="compact-empty">Aucune image personnalisée. L’image actuelle demeure utilisée.</div> }
+                @if (backgroundMessage) { <div class="settings-message">{{ backgroundMessage }}</div> }
+              </div>
+              <div class="order-controls"><span>Ordre d'affichage</span><button type="button" (click)="moveRoom(-1)" aria-label="Monter"><span class="material-symbols-outlined">arrow_upward</span></button><button type="button" (click)="moveRoom(1)" aria-label="Descendre"><span class="material-symbols-outlined">arrow_downward</span></button></div>
+              <div class="equipment-section">
+                <div class="equipment-heading"><div><h4>Éléments du bas</h4><p>Contrôles affichés quand cette pièce est active.</p></div><button type="button" (click)="addControl()"><span class="material-symbols-outlined">add</span>Ajouter</button></div>
+                @for (control of room.controls || []; track control.id; let index = $index) {
+                  <div class="control-editor" draggable="true" [class.dragging]="draggedControlIndex === index" (dragstart)="startControlDrag(index)" (dragover)="$event.preventDefault()" (drop)="dropControl(index)">
+                    <button type="button" class="control-icon-button" (click)="openControlIconPicker(index)"><span class="material-symbols-outlined">{{ control.icon }}</span></button>
+                    <input [(ngModel)]="control.label" (ngModelChange)="saveState = 'idle'" placeholder="Nom affiché">
+                    <button type="button" class="control-entity-button" (click)="openEntityPicker('control', index)"><strong>{{ entityLabel(control.entityId) }}</strong><small>{{ control.entityId || 'Aucune entité' }}</small></button>
+                    <button type="button" class="control-remove" (click)="removeControl(index)" aria-label="Retirer"><span class="material-symbols-outlined">close</span></button>
+                    <div class="control-actions"><label>Clic<select [(ngModel)]="control.tapAction" (ngModelChange)="saveState = 'idle'"><option value="toggle">Basculer</option><option value="turn_on">Allumer</option><option value="turn_off">Éteindre</option></select></label><label>Appui long<select [(ngModel)]="control.holdAction" (ngModelChange)="saveState = 'idle'"><option value="none">Aucune</option><option value="toggle">Basculer</option><option value="turn_on">Allumer</option><option value="turn_off">Éteindre</option></select></label><label class="confirm-check"><input type="checkbox" [(ngModel)]="control.confirm" (ngModelChange)="saveState = 'idle'">Confirmer</label></div>
+                  </div>
+                } @empty { <div class="compact-empty">Aucun élément configuré. L’autodétection reste utilisée jusqu’au premier enregistrement.</div> }
+              </div>
+              <div class="feature-row"><div><span class="material-symbols-outlined">thermostat</span><span><strong>Carte climat</strong><small>Afficher le thermostat dans cette pièce</small></span></div><label class="switch-control"><input type="checkbox" [ngModel]="room.climate?.enabled || false" (ngModelChange)="enableClimate($event)"><span></span></label></div>
+              @if (room.climate?.enabled) { <button type="button" class="wide-entity-button" (click)="openEntityPicker('climate')"><span class="material-symbols-outlined">device_thermostat</span><span><strong>{{ entityLabel(room.climate?.entityId || '') }}</strong><small>{{ room.climate?.entityId || 'Choisir une entité climate' }}</small></span><span class="material-symbols-outlined">chevron_right</span></button> }
+              <div class="feature-row"><div><span class="material-symbols-outlined">vacuum</span><span><strong>Robot aspirateur</strong><small>Afficher l’action aspirateur dans cette pièce</small></span></div><label class="switch-control"><input type="checkbox" [ngModel]="room.vacuum?.enabled || false" (ngModelChange)="enableVacuum($event)"><span></span></label></div>
+              @if (room.vacuum?.enabled) { <button type="button" class="wide-entity-button" (click)="openEntityPicker('vacuum')"><span class="material-symbols-outlined">vacuum</span><span><strong>{{ entityLabel(room.vacuum?.entityId || '') }}</strong><small>{{ room.vacuum?.entityId || 'Choisir une entité vacuum' }}</small></span><span class="material-symbols-outlined">chevron_right</span></button><label>Paramètre de pièce<input [(ngModel)]="room.vacuum!.roomParameter" (ngModelChange)="saveState = 'idle'" placeholder="Exemple : 1,5;"></label> }
+              <button type="button" class="danger-button" (click)="removeSelectedRoom()"><span class="material-symbols-outlined">delete</span>Retirer cette pièce</button>
+            } @else {
+              <div class="empty-state"><span class="material-symbols-outlined">meeting_room</span><h3>Aucune pièce</h3><p>Ajoutez une pièce pour commencer.</p></div>
+            }
+          </section>
+        </div>
+      } @else if (activeSection === 'security') {
+        <div class="content-heading"><div><h2>Sécurité et veille</h2><p>Protégez l’administration et contrôlez le mode veille avec Home Assistant.</p></div></div>
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card-heading"><span class="material-symbols-outlined">lock</span><div><h3>NIP administrateur</h3><p>Le NIP est chiffré et conservé uniquement sur le serveur.</p></div></div>
+            <label>Nouveau NIP<input type="password" inputmode="numeric" maxlength="8" [(ngModel)]="newPin" autocomplete="new-password"></label>
+            <label>Confirmer le NIP<input type="password" inputmode="numeric" maxlength="8" [(ngModel)]="confirmPin" autocomplete="new-password"></label>
+            @if (pinMessage) { <div class="settings-message">{{ pinMessage }}</div> }
+            <button type="button" class="primary-button settings-action" [disabled]="pinSaving" (click)="changePin()">{{ pinSaving ? 'Mise à jour…' : 'Changer le NIP' }}</button>
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><span class="material-symbols-outlined">bedtime</span><div><h3>Détection de présence</h3><p>Choisissez l’entité qui garde le tableau de bord éveillé.</p></div></div>
+            <label>Entité Home Assistant<button type="button" class="entity-selector" (click)="entityPickerOpen = true"><span class="material-symbols-outlined">sensors</span><span class="entity-selector-copy">@if (selectedPresenceEntity; as entity) { <strong>{{ entity.name }}</strong><small>{{ entity.entityId }} · {{ entity.state }}</small> } @else { <strong>Minuterie seulement</strong><small>Aucune entité sélectionnée</small> }</span><span class="material-symbols-outlined">expand_more</span></button></label>
+            <label>État signifiant « écran actif »<input [(ngModel)]="draftSettings.screensaverActiveState" (ngModelChange)="saveState = 'idle'" placeholder="on"></label>
+            <div class="settings-hint"><span class="material-symbols-outlined">info</span><span>Exemple : un <strong>binary_sensor</strong> utilise généralement <strong>on</strong>. Un capteur de présence peut utiliser <strong>home</strong> ou <strong>occupied</strong>.</span></div>
+          </section>
+        </div>
+      } @else if (activeSection === 'appearance') {
+        <div class="content-heading"><div><h2>Apparence et tablette</h2><p>Adaptez le tableau de bord à l’écran et à son environnement.</p></div></div><div class="settings-grid"><section class="settings-card"><div class="settings-card-heading"><span class="material-symbols-outlined">tune</span><div><h3>Interface</h3><p>Réglages globaux appliqués à toutes les pièces.</p></div></div><label>Taille de l’interface · {{ (draftSettings.fontScale * 100).toFixed(0) }} %<input type="range" min="0.85" max="1.25" step="0.05" [(ngModel)]="draftSettings.fontScale" (ngModelChange)="saveState = 'idle'"></label><label>Intensité du verre · {{ (draftSettings.glassOpacity * 100).toFixed(0) }} %<input type="range" min="0.55" max="1.25" step="0.05" [(ngModel)]="draftSettings.glassOpacity" (ngModelChange)="saveState = 'idle'"></label><div class="feature-row"><div><span class="material-symbols-outlined">motion_photos_off</span><span><strong>Réduire les animations</strong><small>Transitions plus courtes et sans mouvement</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.reducedMotion" (ngModelChange)="saveState = 'idle'"><span></span></label></div><div class="feature-row"><div><span class="material-symbols-outlined">schedule</span><span><strong>Format 24 heures</strong><small>Afficher 19:30 plutôt que 7:30 PM</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.clock24h" (ngModelChange)="saveState = 'idle'"><span></span></label></div></section><section class="settings-card"><div class="settings-card-heading"><span class="material-symbols-outlined">tablet_mac</span><div><h3>Mode tablette murale</h3><p>Optimisations pour un écran dédié toujours ouvert.</p></div></div><div class="feature-row"><div><span class="material-symbols-outlined">fullscreen</span><span><strong>Mode tablette</strong><small>Interface tactile et curseur discret</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.tabletMode" (ngModelChange)="saveState = 'idle'"><span></span></label></div><label>Veille après {{ draftSettings.inactivityMinutes }} minutes<input type="range" min="1" max="30" step="1" [(ngModel)]="draftSettings.inactivityMinutes" (ngModelChange)="saveState = 'idle'"></label><div class="settings-hint"><span class="material-symbols-outlined">info</span><span>Le plein écran du navigateur doit être autorisé une première fois directement sur la tablette.</span></div></section></div>
+      } @else if (activeSection === 'system') {
+        <div class="content-heading"><div><h2>Système et sauvegardes</h2><p>Surveillez le serveur et restaurez une configuration précédente.</p></div><button type="button" class="secondary-button" (click)="openSystem()"><span class="material-symbols-outlined">refresh</span>Actualiser</button></div>
+        @if (systemLoading) { <div class="icons-loading system-loader"><span class="material-symbols-outlined">progress_activity</span>Chargement du système…</div> }
+        @else {
+          <div class="health-grid"><article><span class="status-dot" [class.warning]="systemHealth?.status !== 'ok'"></span><div><small>Serveur</small><strong>{{ systemHealth?.status === 'ok' ? 'Opérationnel' : 'Attention requise' }}</strong></div></article><article><span class="material-symbols-outlined">schedule</span><div><small>Temps actif</small><strong>{{ ((systemHealth?.uptime || 0) / 60).toFixed(0) }} minutes</strong></div></article><article><span class="material-symbols-outlined">database</span><div><small>Configuration</small><strong>{{ systemHealth?.homeReadable ? 'Accessible' : 'Indisponible' }}</strong></div></article></div>
+          <section class="backup-card"><div class="backup-heading"><div><h3>Versions précédentes</h3><p>Une version est créée automatiquement avant chaque enregistrement.</p></div><span>{{ backups.length }}</span></div>@for (backup of backups; track backup.id) { <div class="backup-row"><span class="material-symbols-outlined">history</span><div><strong>{{ backup.createdAt | date:'medium' }}</strong><small>{{ (backup.size / 1024).toFixed(1) }} Ko</small></div><button type="button" (click)="restoreBackup(backup)">Restaurer</button></div> } @empty { <div class="compact-empty">Aucune sauvegarde disponible pour le moment.</div> }</section>
+        }
+        @if (systemMessage) { <div class="settings-message system-message">{{ systemMessage }}</div> }
+      } @else {
+        <div class="content-heading"><div><h2>Home Assistant</h2><p>Connexion sécurisée conservée uniquement sur le serveur.</p></div></div>
+        <section class="hass-config-card"><div class="hass-status"><span class="status-dot" [class.warning]="!hassStatus?.connected"></span><div><h3>{{ hassStatus?.connected ? 'Connexion active' : 'Configuration requise' }}</h3><p>Le jeton n’est jamais renvoyé au navigateur après son enregistrement.</p></div></div><label>Adresse Home Assistant<input [(ngModel)]="hassUrl" placeholder="http://192.168.1.10:8123"></label><label>Nouveau jeton d’accès<input type="password" [(ngModel)]="hassToken" autocomplete="new-password" placeholder="Coller un jeton longue durée"></label>@if (hassMessage) { <div class="settings-message">{{ hassMessage }}</div> }<button type="button" class="primary-button settings-action" [disabled]="hassSaving || !hassToken" (click)="saveHassConnection()">{{ hassSaving ? 'Vérification…' : 'Tester et enregistrer' }}</button></section>
+      }
+    </main>
+  </div>
+
+  <footer class="admin-footer">
+    <span class="save-message">@if (saveState === 'saved') { Modifications appliquées à cette session }</span>
+    <button type="button" class="secondary-button" (click)="close.emit()">Fermer</button>
+    <button type="button" class="primary-button" (click)="saveChanges()">Enregistrer</button>
+  </footer>
+
+  @if (iconPickerOpen) {
+    <div class="icon-picker-backdrop" (click)="iconPickerOpen = false">
+      <section class="icon-picker" (click)="$event.stopPropagation()" aria-label="Sélectionner une icône">
+        <header><div><h2>Choisir une icône</h2><p>Catalogue officiel Google Material Symbols</p></div><button type="button" class="icon-button" (click)="iconPickerOpen = false"><span class="material-symbols-outlined">close</span></button></header>
+        <div class="icon-search"><span class="material-symbols-outlined">search</span><input [(ngModel)]="iconQuery" placeholder="Rechercher : lumière, porte, sofa…" autofocus></div>
+        @if (iconsLoading) { <div class="icons-loading"><span class="material-symbols-outlined">progress_activity</span>Chargement du catalogue…</div> }
+        @else { <div class="icon-grid">@for (icon of visibleIcons; track icon) { <button type="button" class="icon-choice" [class.selected]="selectedRoom?.icon === icon" (click)="selectIcon(icon)"><span [class]="'glyph material-symbols-' + (selectedRoom?.iconStyle || 'outlined')" [class.fill-icon]="selectedRoom?.iconFilled">{{ icon }}</span><span class="icon-name">{{ icon.replaceAll('_', ' ') }}</span><span class="favorite material-symbols-outlined" [class.active]="favoriteIcons.includes(icon)" (click)="toggleFavorite(icon, $event)">star</span></button> }</div> }
+        <footer><span>{{ visibleIcons.length }} icônes affichées @if (!iconQuery && icons.length > visibleIcons.length) { sur {{ icons.length }} }</span>@if (!iconQuery && icons.length > visibleIcons.length) { <button type="button" (click)="showMoreIcons()">Afficher 300 de plus</button> }</footer>
+      </section>
+    </div>
+  }
+  @if (entityPickerOpen) {
+    <div class="icon-picker-backdrop" (click)="entityPickerOpen = false">
+      <section class="entity-picker" (click)="$event.stopPropagation()" aria-label="Sélectionner une entité Home Assistant">
+        <header><div><h2>Choisir une entité</h2><p>{{ entities.length }} entités compatibles provenant de Home Assistant</p></div><button type="button" class="icon-button" (click)="entityPickerOpen = false"><span class="material-symbols-outlined">close</span></button></header>
+        <div class="icon-search"><span class="material-symbols-outlined">search</span><input [(ngModel)]="entityQuery" placeholder="Rechercher par nom, identifiant ou état…" autofocus></div>
+        <div class="entity-results">
+          @if (entityPickerMode === 'presence') { <button type="button" class="entity-result" [class.selected]="!draftSettings.screensaverEntityId" (click)="selectPresenceEntity('')"><span class="entity-result-icon material-symbols-outlined">timer</span><span><strong>Minuterie seulement</strong><small>Aucune entité Home Assistant</small></span><span class="material-symbols-outlined check">check</span></button> }
+          @for (entity of visibleEntities; track entity.entityId) { <button type="button" class="entity-result" [class.selected]="isEntitySelected(entity.entityId)" (click)="selectPresenceEntity(entity.entityId)"><span class="entity-result-icon material-symbols-outlined">sensors</span><span><strong>{{ entity.name }}</strong><small>{{ entity.entityId }}</small></span><span class="entity-state">{{ entity.state }}</span><span class="material-symbols-outlined check">check</span></button> }
+          @if (!visibleEntities.length) { <div class="entity-empty"><span class="material-symbols-outlined">search_off</span><p>Aucune entité ne correspond à cette recherche.</p></div> }
+        </div>
+        <footer>{{ visibleEntities.length }} résultat{{ visibleEntities.length > 1 ? 's' : '' }} affiché{{ visibleEntities.length > 1 ? 's' : '' }}</footer>
+      </section>
+    </div>
+  }
+  @if (floorManagerOpen) { <div class="icon-picker-backdrop" (click)="floorManagerOpen = false"><section class="floor-manager" (click)="$event.stopPropagation()"><header><div><h2>Gérer les étages</h2><p>Ajoutez et organisez librement les niveaux de la maison.</p></div><button type="button" class="icon-button" (click)="floorManagerOpen = false"><span class="material-symbols-outlined">close</span></button></header><div class="floor-editor-list">@for (floor of draftFloors; track floor.id; let index = $index) { <div class="floor-editor-row"><span class="material-symbols-outlined floor-grip">drag_indicator</span><input class="floor-icon-input" [(ngModel)]="floor.icon" (ngModelChange)="saveState = 'idle'" aria-label="Icône"><input [(ngModel)]="floor.name" (ngModelChange)="saveState = 'idle'" aria-label="Nom de l'étage"><div class="floor-row-actions"><button type="button" (click)="moveFloor(index,-1)"><span class="material-symbols-outlined">arrow_upward</span></button><button type="button" (click)="moveFloor(index,1)"><span class="material-symbols-outlined">arrow_downward</span></button><button type="button" [disabled]="floorGroups[index].rooms.length > 0" (click)="removeFloor(index)"><span class="material-symbols-outlined">delete</span></button></div></div> }</div><footer><span>Un étage contenant des pièces ne peut pas être supprimé.</span><button type="button" class="primary-button" (click)="addFloor()"><span class="material-symbols-outlined">add</span>Ajouter un étage</button></footer></section></div> }
+</div>

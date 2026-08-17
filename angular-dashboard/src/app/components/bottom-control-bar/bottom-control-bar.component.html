@@ -1,0 +1,48 @@
+<div class="dock">
+  <div class="dock-scroll">
+    @for (item of items; track item.id) {
+      <button
+        type="button"
+        class="control-card"
+        [class.slider-card]="item.hasSlider"
+        [class.active]="item.active"
+        (pointerdown)="startLongPress(item)"
+        (pointerup)="cancelLongPress()"
+        (pointerleave)="cancelLongPress()"
+        (pointercancel)="cancelLongPress()"
+        (click)="onItemClick(item)">
+        <div class="card-content">
+          <div class="card-top">
+            <div class="text-block">
+              <div class="name">{{ item.name }}</div>
+
+              @if (getDisplayValue(item)) {
+                <div class="value">{{ getDisplayValue(item) }}</div>
+              }
+            </div>
+
+            <div class="icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined icon">{{ item.icon }}</span>
+            </div>
+          </div>
+
+          @if (item.hasSlider) {
+            <div
+              class="slider-wrap"
+              (click)="stopPropagation($event)"
+              (pointerdown)="stopPropagation($event)">
+              <input
+                class="slider"
+                type="range"
+                [min]="item.sliderMin ?? 0"
+                [max]="item.sliderMax ?? 100"
+                [step]="item.sliderStep ?? 1"
+                [value]="item.sliderValue ?? 0"
+                (input)="onSliderInput(item, $event)" />
+            </div>
+          }
+        </div>
+      </button>
+    }
+  </div>
+</div>
