@@ -188,6 +188,7 @@
 }
 
 .floor-badge-label {
+  display: inline-block;
   max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -269,6 +270,31 @@
 .menu-wrapper {
   animation: fadeIn 0.3s ease-in-out;
   min-height: 44px;
+}
+
+.menu-wrapper.floor-transition-a,
+.floor-badge-label.floor-transition-a {
+  animation: floorTextInA 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-wrapper.floor-transition-b,
+.floor-badge-label.floor-transition-b {
+  animation: floorTextInB 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes floorTextInA {
+  from { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes floorTextInB {
+  from { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+:host-context(.reduced-motion) .menu-wrapper,
+:host-context(.reduced-motion) .floor-badge-label {
+  animation-duration: 1ms;
 }
 
 @media (max-width: 1100px) {

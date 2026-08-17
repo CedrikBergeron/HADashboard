@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import type { AdminRoom } from '../components/admin-panel/admin-panel.component';
 
 type StoredRoom = { id: string; name: string; floor: 'main' | 'basement'; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
-export type DashboardSettings = { screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number };
+export type DashboardSettings = { homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number };
 export type DashboardFloor = { id: string; name: string; icon: string };
 export type SystemHealth = { status: string; uptime: number; node: string; homeReadable: boolean; sessions: number; now: string };
 export type DashboardBackup = { id: string; createdAt: string; size: number };
@@ -42,6 +42,7 @@ export class DashboardApiService {
         background: room.background ? { ...room.background } : undefined
       })),
       settings: {
+        homeName: String(home.settings?.homeName || home.name || 'La maison'),
         screensaverEntityId: home.settings?.screensaverEntityId || 'input_boolean.dashboard',
         screensaverActiveState: home.settings?.screensaverActiveState || 'on',
         fontScale: Number(home.settings?.fontScale ?? 1), glassOpacity: Number(home.settings?.glassOpacity ?? 1),

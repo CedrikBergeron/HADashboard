@@ -14,6 +14,7 @@
     }
   ],
   "settings": {
+    "homeName": "Résidence Brazeau",
     "screensaverEntityId": "input_boolean.dashboard",
     "screensaverActiveState": "on",
     "fontScale": 1,

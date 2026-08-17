@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { trigger, transition, style, animate } from '@angular/animations';
 import { NavItem } from '../../models/NavItem';
 
 export interface TopNavActionChip {
@@ -13,18 +12,7 @@ export interface TopNavActionChip {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './top-nav.component.html',
-  styleUrl: './top-nav.component.scss',
-  animations: [
-    trigger('fadeInOut', [
-      transition(':enter', [
-        style({ opacity: 0 }),
-        animate('300ms ease-in-out', style({ opacity: 1 }))
-      ]),
-      transition(':leave', [
-        animate('300ms ease-in-out', style({ opacity: 0 }))
-      ])
-    ])
-  ]
+  styleUrl: './top-nav.component.scss'
 })
 export class TopNavComponent {
   private clockLongPressTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -53,7 +41,11 @@ export class TopNavComponent {
   @Output() clockLongPress = new EventEmitter<void>();
 
   currentFloor = 'main';
-  showButtons: boolean = true;
+  floorAnimationAlternate = false;
+
+  get visibleItems(): NavItem[] {
+    return this.items.filter((item) => item.floor === this.currentFloor);
+  }
 
   toggleFloor(): void {
     const available = this.floors.filter((floor) => this.items.some((item) => item.floor === floor.id));
@@ -74,12 +66,8 @@ export class TopNavComponent {
 
     this.pendingFloor = targetFloor;
     this.currentFloor = targetFloor;
-    this.showButtons = false;
-
-    setTimeout(() => {
-      this.showButtons = true;
-      this.onItemClick(targetItem);
-    }, 300);
+    this.floorAnimationAlternate = !this.floorAnimationAlternate;
+    this.onItemClick(targetItem);
   }
 
   ngOnInit(): void {

@@ -11,13 +11,11 @@
       (contextmenu)="$event.preventDefault()"
       aria-label="Heure actuelle">{{ time }}</button>
 
-    <div class="menu-wrapper">
-      @for (item of items; track item.label) {
-      @if (showButtons && item.floor === currentFloor) {
-      <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)" @fadeInOut>
+    <div class="menu-wrapper" [class.floor-transition-a]="floorAnimationAlternate" [class.floor-transition-b]="!floorAnimationAlternate">
+      @for (item of visibleItems; track item.value) {
+      <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)">
         <span>{{ item.label }}</span>
       </button>
-      }
       }
     </div>
 
@@ -42,13 +40,11 @@
           </span>
         </button>
       }
-      @if (showButtons) {
-        <button type="button" class="floor-badge" (click)="toggleFloor()" aria-label="Changer d'étage" @fadeInOut>
+        <button type="button" class="floor-badge" (click)="toggleFloor()" aria-label="Changer d'étage">
           <span class="material-symbols-outlined floor-badge-icon">stairs_2</span>
-          <span class="floor-badge-label">{{ currentFloorLabel }}</span>
+          <span class="floor-badge-label" [class.floor-transition-a]="floorAnimationAlternate" [class.floor-transition-b]="!floorAnimationAlternate">{{ currentFloorLabel }}</span>
           <span class="material-symbols-outlined floor-badge-arrow">{{ currentFloorArrow }}</span>
         </button>
-      }
     </div>
   </nav>
 </header>

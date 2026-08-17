@@ -240,7 +240,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   adminSaveError = '';
   hassSetupRequired = false;
   hassNoticeDismissed = false;
-  dashboardSettings: DashboardSettings = { screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Rez-de-chaussée', icon: 'stairs' }, { id: 'basement', name: 'Sous-sol', icon: 'stairs_2' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
     return this.navItems.flatMap((nav) => {

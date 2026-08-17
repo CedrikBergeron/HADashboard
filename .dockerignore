@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+angular-dashboard/node_modules
+angular-dashboard/dist
+data/backups
+data/cache
+data/secrets
+data/uploads
+npm-debug.log*

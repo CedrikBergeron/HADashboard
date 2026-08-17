@@ -35,7 +35,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Input() rooms: NavItem[] = [];
   @Input() entities: AdminEntityOption[] = [];
   @Input() floors: DashboardFloor[] = [];
-  @Input() settings: DashboardSettings = { screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  @Input() settings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
@@ -50,7 +50,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   iconsLoading = false;
   favoriteIcons: string[] = [];
   iconLimit = 300;
-  draftSettings: DashboardSettings = { screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  draftSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
   newPin = '';
   confirmPin = '';
   pinMessage = '';

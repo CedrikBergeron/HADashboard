@@ -1,0 +1,17 @@
+name: "HA Dashboard"
+description: "Tableau de bord mural Angular pour Home Assistant"
+version: "1.0.0"
+slug: "ha_dashboard"
+init: false
+startup: services
+boot: auto
+arch:
+  - aarch64
+  - amd64
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: "Interface du tableau de bord"
+webui: "http://[HOST]:[PORT:3000]"
+panel_icon: "mdi:view-dashboard"
+backup: hot
