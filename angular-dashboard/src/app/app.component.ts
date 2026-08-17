@@ -53,6 +53,9 @@ type RoomControlConfig = {
   exclude?: string[];
 };
 
+type HomeAttentionItem = { icon: string; label: string; detail: string; tone: 'normal' | 'warning' | 'danger' };
+type HomeToast = { id: number; icon: string; title: string; detail: string };
+
 const ROOM_META: Record<string, { label: string; floor: Floor; order: number }> = {
   entree: { label: 'Entrée', floor: 'main', order: 0 },
   salon: { label: 'Salon', floor: 'main', order: 1 },
@@ -186,6 +189,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private readonly roomTransitionDurationMs = 180;
   private readonly sliderUpdateTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly subscriptions = new Subscription();
+  private toastSequence = 0;
+  private notificationsInitialized = false;
+  private previousImportantStates: Record<string, string> = {};
   private climateDialPointerId: number | null = null;
   private climateCommitTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private climatePopoutCloseTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -224,6 +230,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   vacuumSupportsAreaCleaning = false;
   dashboardPresenceActive = true;
   screensaverActive = false;
+  lastRoomValue = 'entree';
+  homeToasts: HomeToast[] = [];
+  hassConnected = false;
   adminUnlockOpen = false;
   adminPanelOpen = false;
   adminPinValue = '';
@@ -246,6 +255,34 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   get activeBackgroundOverlay(): number {
     return this.roomBackgrounds.find((background) => background.roomValue === this.activeRoomValue)?.overlay ?? .26;
   }
+
+  get overviewActive(): boolean { return this.activeRoomValue === '__overview__'; }
+  get displayBackgroundRoomValue(): string { return this.overviewActive ? this.lastRoomValue : this.activeRoomValue; }
+
+  get attentionItems(): HomeAttentionItem[] {
+    const values = Object.values(this.latestEntities);
+    const lights = values.filter((entity) => entity.entity_id.startsWith('light.') && entity.state === 'on').length;
+    const unlocked = values.filter((entity) => entity.entity_id.startsWith('lock.') && ['unlocked','unlocking'].includes(entity.state)).length;
+    const openings = values.filter((entity) => entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on' && ['door','window','garage_door','opening'].includes(String(entity.attributes['device_class']))).length;
+    const items: HomeAttentionItem[] = [];
+    if (unlocked) items.push({ icon: 'lock_open', label: `${unlocked} porte${unlocked > 1 ? 's' : ''} déverrouillée${unlocked > 1 ? 's' : ''}`, detail: 'Sécurité', tone: 'danger' });
+    if (openings) items.push({ icon: 'door_open', label: `${openings} ouverture${openings > 1 ? 's' : ''}`, detail: 'Porte ou fenêtre ouverte', tone: 'warning' });
+    if (lights) items.push({ icon: 'lightbulb', label: `${lights} lumière${lights > 1 ? 's' : ''} allumée${lights > 1 ? 's' : ''}`, detail: 'Dans la maison', tone: 'normal' });
+    return items;
+  }
+  get lightsOnCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('light.') && entity.state === 'on').length; }
+  get unlockedCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('lock.') && ['unlocked','unlocking'].includes(entity.state)).length; }
+  get openAccessCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on' && ['door','window','garage_door','opening'].includes(String(entity.attributes['device_class']))).length; }
+  get homeStatusLabel(): string { return this.unlockedCount || this.openAccessCount ? 'Attention requise' : 'Maison en ordre'; }
+
+  get weatherState(): HassEntityState | undefined { return Object.values(this.latestEntities).find((entity) => entity.entity_id.startsWith('weather.')); }
+  get weatherTemperature(): string { const value = this.weatherState?.attributes?.['temperature']; return value === undefined ? '--' : `${Math.round(Number(value))}°`; }
+  get weatherLabel(): string {
+    const state = String(this.weatherState?.state || 'unknown').toLowerCase();
+    return ({ sunny: 'Ensoleillé', clear: 'Dégagé', 'clear-night': 'Nuit dégagée', cloudy: 'Nuageux', partlycloudy: 'Partiellement nuageux', rainy: 'Pluvieux', pouring: 'Forte pluie', snowy: 'Neige', fog: 'Brouillard', foggy: 'Brouillard', windy: 'Venteux', lightning: 'Orages', 'lightning-rainy': 'Orages et pluie', hail: 'Grêle', exceptional: 'Conditions exceptionnelles', unknown: 'Météo indisponible' } as Record<string,string>)[state] ?? this.capitalizeWords(state.replace(/_/g, ' '));
+  }
+  get weatherIcon(): string { const state = this.weatherState?.state || ''; if (state.includes('rain') || state.includes('pouring')) return 'rainy'; if (state.includes('snow')) return 'weather_snowy'; if (state.includes('cloud')) return 'cloud'; if (state.includes('lightning')) return 'thunderstorm'; if (state.includes('fog')) return 'foggy'; return 'sunny'; }
+  get currentDateLabel(): string { return new Date().toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }); }
 
   isDaytime = false;
   bgBrightness = 0.72;
@@ -272,6 +309,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.clockIntervalId = setInterval(() => {
       this.updateClock();
     }, 1000);
+    this.resetInactivityTimer();
 
     this.subscriptions.add(
       combineLatest([
@@ -284,6 +322,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         this.syncDashboardState(areas, devices, entityRegistry, entities, services);
       })
     );
+    this.subscriptions.add(this.hass.connected$.subscribe((connected) => this.hassConnected = connected));
   }
 
   ngOnDestroy(): void {
@@ -416,12 +455,12 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.adminRoomsOverride = rooms.map((room) => ({ ...room }));
     this.dashboardSettings = { ...settings };
     this.applyInterfaceSettings();
+    if (!this.screensaverActive) this.resetInactivityTimer();
     this.dashboardFloors = floors.map((floor) => ({ ...floor }));
     this.dashboardPresenceInitialized = false;
     if (!settings.screensaverEntityId) {
       this.dashboardPresenceActive = true;
       this.stopScreensaver();
-      this.resetInactivityTimer();
     }
     const activeStillExists = rooms.some((room) => room.id === this.activeRoomValue);
     this.navItems = rooms.map((room, index) => ({
@@ -453,6 +492,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.adminRoomsOverride = home.rooms;
       this.dashboardSettings = home.settings;
       this.applyInterfaceSettings();
+      // The initial timer starts before the server settings arrive.
+      // Restart it so the configured inactivity delay is actually respected.
+      if (!this.screensaverActive) this.resetInactivityTimer();
       this.dashboardFloors = home.floors;
       this.navItems = home.rooms.map((room, index) => ({
         label: room.name,
@@ -498,6 +540,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   onControlClick(item: BottomControlItem): void {
     this.resetInactivityTimer();
+    if (!this.hassConnected) { this.showOfflineToast(); return; }
     void this.handleConfiguredControlAction(item as DashboardControlItem, (item as DashboardControlItem).tapAction ?? 'toggle');
   }
 
@@ -508,6 +551,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   onSliderChange(event: { item: BottomControlItem; value: number }): void {
     this.resetInactivityTimer();
+    if (!this.hassConnected) { this.showOfflineToast(); return; }
     const item = event.item as DashboardControlItem;
     this.scheduleSliderUpdate(item, event.value);
   }
@@ -669,27 +713,29 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.inactivityTimeoutId = null;
     }
 
-    if (this.dashboardPresenceActive) {
-      this.screensaverWakeOverrideActive = false;
-      this.inactivityTimeoutId = setTimeout(() => {
-        this.inactivityTimeoutId = null;
-        this.returnToDefaultRoom();
-      }, this.homeReturnDurationMs);
-      return;
-    }
-
-    this.screensaverWakeOverrideActive = true;
     this.inactivityTimeoutId = setTimeout(() => {
       this.inactivityTimeoutId = null;
-      this.screensaverWakeOverrideActive = false;
       this.startScreensaver();
     }, Math.max(1, this.dashboardSettings.inactivityMinutes) * 60_000);
   }
 
   private wakeFromScreensaver(): void {
     this.stopScreensaver();
-    this.returnToDefaultRoom();
+    this.showHomeOverview();
     this.resetInactivityTimer();
+  }
+
+  private showHomeOverview(): void {
+    this.lastRoomValue = this.activeRoomValue === '__overview__' ? this.lastRoomValue : this.activeRoomValue;
+    this.activeRoomValue = '__overview__';
+    this.activeControls = [];
+    this.currentRoomClimate = null;
+    this.vacuumControl = null;
+    this.vacuumActionChip = null;
+    this.controlsVisible = false;
+    this.navItems = this.navItems.map((item) => ({ ...item, active: false }));
+    this.closeClimatePopout();
+    this.closeVacuumSheet();
   }
 
   private startScreensaver(): void {
@@ -755,26 +801,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.dashboardPresenceInitialized = true;
     this.dashboardPresenceActive = nextPresenceActive;
 
-    if (!presenceChanged) {
-      return;
-    }
-
-    if (nextPresenceActive) {
-      this.screensaverWakeOverrideActive = false;
-      if (this.inactivityTimeoutId) {
-        clearTimeout(this.inactivityTimeoutId);
-        this.inactivityTimeoutId = null;
-      }
-
-      this.stopScreensaver();
-      this.returnToDefaultRoom();
-      this.resetInactivityTimer();
-      return;
-    }
-
-    if (!this.screensaverWakeOverrideActive) {
-      this.startScreensaver();
-    }
+    if (presenceChanged && nextPresenceActive && this.screensaverActive) this.wakeFromScreensaver();
   }
 
   private returnToDefaultRoom(): void {
@@ -812,6 +839,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     entities: Record<string, HassEntityState>,
     services: HassServiceCatalog
   ): void {
+    this.updateHomeNotifications(entities);
     this.latestDevices = devices;
     this.latestEntityRegistry = entityRegistry;
     this.latestEntities = entities;
@@ -820,6 +848,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.roomAreaIdsByValue = this.buildRoomAreaIdsByValue(areas);
     this.vacuumSupportsAreaCleaning = this.hasService(services, 'vacuum', 'clean_area');
     this.syncDashboardPresence(entities);
+
+    if (this.overviewActive) {
+      this.navItems = this.navItems.map((item) => ({ ...item, active: false }));
+      return;
+    }
 
     const availableRoomValue = this.navItems.some((item) => item.value === this.activeRoomValue)
       ? this.activeRoomValue
@@ -1443,6 +1476,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private setActiveRoom(roomValue: string, fallbackLabel?: string): void {
     const roomChanged = this.activeRoomValue !== roomValue;
     this.activeRoomValue = roomValue;
+    if (roomValue !== '__overview__') this.lastRoomValue = roomValue;
     this.activeControls = this.controlsByRoom[roomValue] ?? [];
     this.currentRoomClimate = this.buildRoomClimate(
       this.latestEntityRegistry,
@@ -1619,6 +1653,40 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     }
 
     return this.translateClimateStatus(state.state);
+  }
+
+  private updateHomeNotifications(entities: Record<string, HassEntityState>): void {
+    const important = Object.values(entities).filter((entity) => {
+      const domain = entity.entity_id.split('.')[0];
+      const deviceClass = String(entity.attributes['device_class'] || '');
+      return domain === 'lock' || (domain === 'binary_sensor' && ['door','window','garage_door','opening'].includes(deviceClass)) || ['unavailable','unknown'].includes(entity.state);
+    });
+    if (!this.notificationsInitialized) {
+      for (const entity of important) this.previousImportantStates[entity.entity_id] = entity.state;
+      this.notificationsInitialized = true;
+      return;
+    }
+    for (const entity of important) {
+      const previous = this.previousImportantStates[entity.entity_id];
+      this.previousImportantStates[entity.entity_id] = entity.state;
+      if (!previous || previous === entity.state) continue;
+      const friendlyName = String(entity.attributes['friendly_name'] || this.humanizeEntityId(entity.entity_id));
+      let toast: Omit<HomeToast, 'id'> | null = null;
+      if (entity.entity_id.startsWith('lock.') && entity.state === 'unlocked') toast = { icon: 'lock_open', title: friendlyName, detail: 'Déverrouillée' };
+      else if (entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on') toast = { icon: 'door_open', title: friendlyName, detail: 'Ouverte' };
+      else if (entity.state === 'unavailable') toast = { icon: 'cloud_off', title: friendlyName, detail: 'Appareil indisponible' };
+      if (toast) {
+        const item = { ...toast, id: ++this.toastSequence };
+        this.homeToasts = [...this.homeToasts.slice(-2), item];
+        setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 5000);
+      }
+    }
+  }
+
+  private showOfflineToast(): void {
+    const item: HomeToast = { id: ++this.toastSequence, icon: 'cloud_off', title: 'Mode hors ligne', detail: 'Cette action sera disponible après la reconnexion.' };
+    this.homeToasts = [...this.homeToasts.slice(-2), item];
+    setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 3500);
   }
 
   private translateClimateStatus(value: string): string {

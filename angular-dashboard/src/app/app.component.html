@@ -10,7 +10,7 @@
       [src]="background.src"
       [style.object-position]="background.positionX + '% ' + background.positionY + '%'"
       [style.filter]="'brightness(' + background.brightness + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"
-      [style.opacity]="activeRoomValue === background.roomValue ? 1 : 0"
+      [style.opacity]="displayBackgroundRoomValue === background.roomValue ? 1 : 0"
       alt="" />
   }
   <div class="overlay" [style.background]="'rgba(0, 0, 0, ' + activeBackgroundOverlay + ')'" ></div>
@@ -24,6 +24,19 @@
     (itemClick)="onNavClick($event)"
     (actionChipClick)="onVacuumChipClick()">
   </app-top-nav>
+
+  @if (overviewActive && !screensaverActive) {
+    <main class="home-overview">
+      <header class="overview-heading"><div><span>Vue globale</span><h1>La maison</h1><p>{{ currentDateLabel }}</p></div><section class="overview-weather"><span class="material-symbols-outlined">{{ weatherIcon }}</span><div><strong>{{ weatherTemperature }}</strong><small>{{ weatherLabel }}</small></div></section></header>
+      <section class="overview-summary"><div class="summary-metrics"><article><span class="material-symbols-outlined">lightbulb</span><strong>{{ lightsOnCount }}</strong><small>allumée{{ lightsOnCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">door_front</span><strong>{{ openAccessCount }}</strong><small>ouverte{{ openAccessCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">lock</span><strong>{{ unlockedCount }}</strong><small>déverrouillée{{ unlockedCount > 1 ? 's' : '' }}</small></article></div></section>
+      @if (!hassConnected) { <div class="offline-strip"><span class="material-symbols-outlined">cloud_off</span><div><strong>Mode hors ligne</strong><small>Affichage des derniers états connus. Reconnexion automatique en cours.</small></div></div> }
+      <p class="overview-hint">Choisissez une pièce dans la barre supérieure pour continuer.</p>
+    </main>
+  }
+
+  @if (screensaverActive) { <section class="screensaver-display"><div class="screensaver-time">{{ now }}</div><div class="screensaver-date">{{ currentDateLabel }}</div><div class="screensaver-weather"><span class="material-symbols-outlined">{{ weatherIcon }}</span>{{ weatherTemperature }} · {{ weatherLabel }}</div><div class="screensaver-wake">Touchez pour ouvrir la maison</div></section> }
+
+  <div class="toast-stack">@for (toast of homeToasts; track toast.id) { <article class="home-toast"><span class="material-symbols-outlined">{{ toast.icon }}</span><div><strong>{{ toast.title }}</strong><small>{{ toast.detail }}</small></div></article> }</div>
 
   @if (currentRoomClimate) {
     <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible">

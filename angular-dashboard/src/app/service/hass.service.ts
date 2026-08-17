@@ -64,10 +64,11 @@ interface HassPendingRequest {
 })
 export class HassService {
   private ws: WebSocket | null = null;
-  private readonly entitiesSubject = new BehaviorSubject<Record<string, HassEntityState>>({});
-  private readonly areasSubject = new BehaviorSubject<HassAreaRegistryEntry[]>([]);
-  private readonly devicesSubject = new BehaviorSubject<HassDeviceRegistryEntry[]>([]);
-  private readonly entityRegistrySubject = new BehaviorSubject<HassEntityRegistryEntry[]>([]);
+  private cacheTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly entitiesSubject = new BehaviorSubject<Record<string, HassEntityState>>(this.readCache('entities', {}));
+  private readonly areasSubject = new BehaviorSubject<HassAreaRegistryEntry[]>(this.readCache('areas', []));
+  private readonly devicesSubject = new BehaviorSubject<HassDeviceRegistryEntry[]>(this.readCache('devices', []));
+  private readonly entityRegistrySubject = new BehaviorSubject<HassEntityRegistryEntry[]>(this.readCache('entity-registry', []));
   private readonly servicesSubject = new BehaviorSubject<HassServiceCatalog>({});
   private readonly connectedSubject = new BehaviorSubject<boolean>(false);
 
@@ -247,6 +248,10 @@ export class HassService {
         }, {})
       );
       this.servicesSubject.next(services);
+      this.saveCache('areas', areas);
+      this.saveCache('devices', devices);
+      this.saveCache('entity-registry', entityRegistry);
+      this.scheduleEntityCache();
 
       await this.sendCommand({
         type: 'subscribe_events',
@@ -272,6 +277,20 @@ export class HassService {
     }
 
     this.entitiesSubject.next(nextEntities);
+    this.scheduleEntityCache();
+  }
+
+  private readCache<T>(key: string, fallback: T): T {
+    try { const value = localStorage.getItem(`ha-dashboard-${key}`); return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
+  }
+
+  private saveCache(key: string, value: unknown): void {
+    try { localStorage.setItem(`ha-dashboard-${key}`, JSON.stringify(value)); localStorage.setItem('ha-dashboard-cache-time', new Date().toISOString()); } catch {}
+  }
+
+  private scheduleEntityCache(): void {
+    if (this.cacheTimeoutId) clearTimeout(this.cacheTimeoutId);
+    this.cacheTimeoutId = setTimeout(() => { this.cacheTimeoutId = null; this.saveCache('entities', this.entitiesSubject.value); }, 1000);
   }
 
   private sendCommand<T>(payload: Record<string, any>): Promise<T> {
