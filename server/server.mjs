@@ -12,6 +12,7 @@ const homesDir = join(dataDir, 'homes');
 const backupsDir = join(dataDir, 'backups');
 const cacheDir = join(dataDir, 'cache');
 const secretsDir = join(dataDir, 'secrets');
+const uploadsDir = join(dataDir, 'uploads');
 const distDir = join(root, 'angular-dashboard', 'dist', 'angular-dashboard', 'browser');
 const port = Number(process.env.PORT || 3000);
 const defaultAdminPin = process.env.ADMIN_PIN || '2580';
@@ -20,7 +21,7 @@ const sessions = new Map();
 const iconSource = 'https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints';
 const fallbackIcons = ['home','apartment','cottage','door_front','meeting_room','weekend','chair','bed','bedroom_parent','kitchen','countertops','dining','table_restaurant','bathroom','shower','bathtub','stairs_2','garage_home','deck','yard','lightbulb','floor_lamp','fluorescent','mode_fan','thermostat','heat_pump','ac_unit','water_heater','humidity_percentage','lock','lock_open','door_sensor','shield','security','sensors','motion_sensor_active','videocam','tv','speaker','router','wifi','electrical_services','power','outlet','blinds','curtains','vacuum','cleaning_services','local_laundry_service','dishwasher','oven','microwave','coffee_maker','scene','palette','settings','toggle_on'];
 
-await Promise.all([homesDir, backupsDir, cacheDir, secretsDir].map((dir) => mkdir(dir, { recursive: true })));
+await Promise.all([homesDir, backupsDir, cacheDir, secretsDir, uploadsDir].map((dir) => mkdir(dir, { recursive: true })));
 
 async function adminSecret() {
   try { return JSON.parse(await readFile(join(secretsDir, 'admin.json'), 'utf8')); } catch { return null; }
@@ -52,11 +53,11 @@ function json(res, status, value, extra = {}) {
   res.end(JSON.stringify(value));
 }
 
-async function body(req) {
+async function body(req, maxBytes = 1_000_000) {
   let raw = '';
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 1_000_000) throw new Error('Payload too large');
+    if (raw.length > maxBytes) throw new Error('Payload too large');
   }
   return raw ? JSON.parse(raw) : {};
 }
@@ -139,6 +140,23 @@ async function api(req, res, url) {
     return json(res, 200, { saved: true });
   }
   if (req.method === 'GET' && url.pathname === '/api/icons') return json(res, 200, await iconCatalog());
+  const backgroundMatch = url.pathname.match(/^\/api\/homes\/([a-z0-9-]+)\/rooms\/([a-z0-9-]+)\/background$/);
+  if (backgroundMatch && req.method === 'POST') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const value = await body(req, 16_000_000);
+    const match = String(value.dataUrl || '').match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return json(res, 400, { error: 'Image JPEG, PNG ou WebP requise' });
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer.length || buffer.length > 10_000_000) return json(res, 400, { error: 'L’image doit faire moins de 10 Mo' });
+    const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const homeId = backgroundMatch[1];
+    const roomId = backgroundMatch[2];
+    const targetDir = join(uploadsDir, 'homes', homeId);
+    await mkdir(targetDir, { recursive: true });
+    const filename = `${roomId}-${Date.now()}.${extension}`;
+    await writeFile(join(targetDir, filename), buffer, { mode: 0o644 });
+    return json(res, 200, { url: `/uploads/homes/${homeId}/${filename}` });
+  }
   const homeMatch = url.pathname.match(/^\/api\/homes\/([a-z0-9-]+)$/);
   if (homeMatch && req.method === 'GET') {
     try { return json(res, 200, await readHome(homeMatch[1])); } catch { return json(res, 404, { error: 'Maison introuvable' }); }
@@ -161,6 +179,14 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+    if (url.pathname.startsWith('/uploads/')) {
+      const requestedUpload = normalize(url.pathname.replace(/^\/uploads\/+/, ''));
+      if (requestedUpload.startsWith('..')) return json(res, 403, { error: 'Accès refusé' });
+      const file = join(uploadsDir, requestedUpload);
+      try { await stat(file); } catch { return json(res, 404, { error: 'Image introuvable' }); }
+      res.writeHead(200, { 'content-type': mime[extname(file)] || 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable' });
+      return createReadStream(file).pipe(res);
+    }
     const requested = normalize(url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, ''));
     if (requested.startsWith('..')) return json(res, 403, { error: 'Accès refusé' });
     let file = join(distDir, requested);

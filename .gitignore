@@ -1,6 +1,7 @@
 data/cache/
 data/backups/
 data/secrets/
+data/uploads/
 .env
 angular-dashboard/dist/
 angular-dashboard/node_modules/
