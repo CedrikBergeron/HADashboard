@@ -29,6 +29,7 @@
     <main class="home-overview">
       <header class="overview-heading"><div><span>Vue globale</span><h1>{{ dashboardSettings.homeName || 'La maison' }}</h1><p>{{ currentDateLabel }}</p></div><section class="overview-weather"><span class="material-symbols-outlined">{{ weatherIcon }}</span><div><strong>{{ weatherTemperature }}</strong><small>{{ weatherLabel }}</small></div></section></header>
       <section class="overview-summary"><div class="summary-metrics"><article><span class="material-symbols-outlined">lightbulb</span><strong>{{ lightsOnCount }}</strong><small>allumée{{ lightsOnCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">door_front</span><strong>{{ openAccessCount }}</strong><small>ouverte{{ openAccessCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">lock</span><strong>{{ unlockedCount }}</strong><small>déverrouillée{{ unlockedCount > 1 ? 's' : '' }}</small></article></div></section>
+      @if (quickActions.length) { <section class="overview-quick-actions" aria-label="Actions rapides">@for (action of quickActions; track action.id) { <button type="button" (click)="onControlClick(action)"><span class="material-symbols-outlined">{{ action.icon }}</span>{{ action.name }}</button> }</section> }
       @if (!hassConnected) { <div class="offline-strip"><span class="material-symbols-outlined">cloud_off</span><div><strong>Mode hors ligne</strong><small>Affichage des derniers états connus. Reconnexion automatique en cours.</small></div></div> }
       <p class="overview-hint">Choisissez une pièce dans la barre supérieure pour continuer.</p>
     </main>
@@ -128,13 +129,23 @@
   }
   @if (hassSetupRequired && !hassNoticeDismissed && !adminUnlockOpen && !adminPanelOpen) { <div class="hass-notice"><span class="material-symbols-outlined">cloud_off</span><div><strong>Home Assistant déconnecté</strong><small>Maintenez l’heure pour mettre à jour la connexion.</small></div><button type="button" (click)="hassNoticeDismissed = true"><span class="material-symbols-outlined">close</span></button></div> }
 
-  @if (isVacuumSheetVisible || isClimatePopoutVisible) {
+  @if (isVacuumSheetVisible || isClimatePopoutVisible || controlDetail) {
     <button
       type="button"
       class="sheet-backdrop"
       [class.is-closing]="!vacuumSheetOpen && !climatePopoutOpen && (vacuumSheetClosing || climatePopoutClosing)"
-      (click)="closeVacuumSheet(); closeClimatePopout()"
+      (click)="closeVacuumSheet(); closeClimatePopout(); closeControlDetail()"
       [attr.aria-label]="vacuumSheetOpen ? 'Fermer le menu aspirateur' : 'Fermer le contrôle du thermostat'"></button>
+  }
+
+  @if (controlDetail; as detail) {
+    <section class="control-detail-sheet" aria-label="Contrôle détaillé">
+      <header><span class="material-symbols-outlined">{{ detail.icon }}</span><div><small>Contrôle</small><h2>{{ detail.name }}</h2><p>{{ detail.value || detail.state }}</p></div><button type="button" (click)="closeControlDetail()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></header>
+      @if (detail.hasSlider) {
+        <div class="control-detail-slider"><div><span>{{ controlDetailSliderLabel }}</span><strong>{{ detail.sliderValue || 0 }} %</strong></div><input type="range" [min]="detail.sliderMin || 0" [max]="detail.sliderMax || 100" [step]="detail.sliderStep || 1" [value]="detail.sliderValue || 0" (input)="onControlDetailSlider($event)"></div>
+      }
+      <div class="control-detail-actions"><button type="button" (click)="onControlDetailAction('turn_off')"><span class="material-symbols-outlined">power_settings_new</span>{{ controlDetailOffLabel }}</button><button type="button" class="primary" (click)="onControlDetailAction('turn_on')"><span class="material-symbols-outlined">power</span>{{ controlDetailOnLabel }}</button></div>
+    </section>
   }
 
   @if (isVacuumSheetVisible && vacuumControl) {

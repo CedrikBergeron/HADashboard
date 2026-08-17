@@ -227,6 +227,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   vacuumControl: VacuumControl | null = null;
   vacuumSheetOpen = false;
   vacuumSheetClosing = false;
+  controlDetail: DashboardControlItem | null = null;
   vacuumSupportsAreaCleaning = false;
   dashboardPresenceActive = true;
   screensaverActive = false;
@@ -274,6 +275,12 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   get unlockedCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('lock.') && ['unlocked','unlocking'].includes(entity.state)).length; }
   get openAccessCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on' && ['door','window','garage_door','opening'].includes(String(entity.attributes['device_class']))).length; }
   get homeStatusLabel(): string { return this.unlockedCount || this.openAccessCount ? 'Attention requise' : 'Maison en ordre'; }
+  get quickActions(): DashboardControlItem[] {
+    return Object.values(this.latestEntities)
+      .filter((entity) => entity.entity_id.startsWith('scene.') || entity.entity_id.startsWith('script.'))
+      .slice(0, 4)
+      .map((entity) => ({ id: entity.entity_id, entityId: entity.entity_id, name: String(entity.attributes['friendly_name'] || this.humanizeEntityId(entity.entity_id)), icon: entity.entity_id.startsWith('scene.') ? 'scene' : 'play_arrow', domain: entity.entity_id.split('.')[0], state: entity.state, value: '', active: false, clickable: true }));
+  }
 
   get weatherState(): HassEntityState | undefined { return Object.values(this.latestEntities).find((entity) => entity.entity_id.startsWith('weather.')); }
   get weatherTemperature(): string { const value = this.weatherState?.attributes?.['temperature']; return value === undefined ? '--' : `${Math.round(Number(value))}°`; }
@@ -538,15 +545,64 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     }, this.roomTransitionDurationMs);
   }
 
-  onControlClick(item: BottomControlItem): void {
+  async onControlClick(item: BottomControlItem): Promise<void> {
     this.resetInactivityTimer();
     if (!this.hassConnected) { this.showOfflineToast(); return; }
-    void this.handleConfiguredControlAction(item as DashboardControlItem, (item as DashboardControlItem).tapAction ?? 'toggle');
+    const control = item as DashboardControlItem;
+    control.pending = true;
+    try {
+      await this.handleConfiguredControlAction(control, control.tapAction ?? 'toggle');
+    } catch {
+      this.showActionToast(control.name, 'La commande a échoué', 'error');
+    } finally {
+      control.pending = false;
+    }
   }
 
   onControlLongPress(item: BottomControlItem): void {
     const control = item as DashboardControlItem;
-    if (control.holdAction && control.holdAction !== 'none') void this.handleConfiguredControlAction(control, control.holdAction);
+    this.resetInactivityTimer();
+    if (control.holdAction && control.holdAction !== 'none') {
+      void this.handleConfiguredControlAction(control, control.holdAction);
+      return;
+    }
+    this.controlDetail = control;
+    this.closeClimatePopout();
+    this.closeVacuumSheet();
+  }
+
+  closeControlDetail(): void { this.controlDetail = null; }
+
+  async onControlDetailAction(action: 'turn_on' | 'turn_off' | 'toggle'): Promise<void> {
+    if (!this.controlDetail || !this.hassConnected) { if (!this.hassConnected) this.showOfflineToast(); return; }
+    const control = this.controlDetail;
+    control.pending = true;
+    try {
+      await this.handleConfiguredControlAction(control, action);
+    } catch {
+      this.showActionToast(control.name, 'La commande a échoué', 'error');
+    } finally {
+      control.pending = false;
+    }
+  }
+
+  onControlDetailSlider(event: Event): void {
+    if (!this.controlDetail) return;
+    this.onSliderChange({ item: this.controlDetail, value: Number((event.target as HTMLInputElement).value) });
+  }
+
+  get controlDetailOnLabel(): string {
+    return this.controlDetail?.domain === 'lock' ? 'Déverrouiller' : this.controlDetail?.domain === 'cover' ? 'Ouvrir' : 'Allumer';
+  }
+
+  get controlDetailOffLabel(): string {
+    return this.controlDetail?.domain === 'lock' ? 'Verrouiller' : this.controlDetail?.domain === 'cover' ? 'Fermer' : 'Éteindre';
+  }
+
+  get controlDetailSliderLabel(): string {
+    if (this.controlDetail?.domain === 'cover') return 'Ouverture';
+    if (this.controlDetail?.domain === 'fan') return 'Vitesse';
+    return 'Luminosité';
   }
 
   onSliderChange(event: { item: BottomControlItem; value: number }): void {
@@ -736,6 +792,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.navItems = this.navItems.map((item) => ({ ...item, active: false }));
     this.closeClimatePopout();
     this.closeVacuumSheet();
+    this.closeControlDetail();
   }
 
   private startScreensaver(): void {
@@ -1578,13 +1635,13 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     if (domain === 'lock') {
       switch (state.state) {
         case 'locked':
-          return 'Vérouillé';
+          return 'Verrouillé';
         case 'unlocked':
-          return 'Dévérouillé';
+          return 'Déverrouillé';
         case 'unlocking':
-          return 'Dévérouillage';
+          return 'Déverrouillage';
         case 'locking':
-          return 'Vérouillage';
+          return 'Verrouillage';
         default:
           return this.capitalizeWords(state.state.replace(/_/g, ' '));
       }
@@ -1594,7 +1651,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       return `${Math.round(Number(state.attributes['current_position'] ?? state.attributes['position'] ?? 0))}%`;
     }
 
-    return this.capitalizeWords(state.state.replace(/_/g, ' '));
+    const translated = ({ off: 'Éteint', on: 'Allumé', unavailable: 'Indisponible', unknown: 'Inconnu', standby: 'En veille', idle: 'En veille' } as Record<string,string>)[state.state.toLowerCase()];
+    return translated ?? this.capitalizeWords(state.state.replace(/_/g, ' '));
   }
 
   private getDisplayName(entityEntry: HassEntityRegistryEntry, state: HassEntityState): string {
@@ -1687,6 +1745,12 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     const item: HomeToast = { id: ++this.toastSequence, icon: 'cloud_off', title: 'Mode hors ligne', detail: 'Cette action sera disponible après la reconnexion.' };
     this.homeToasts = [...this.homeToasts.slice(-2), item];
     setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 3500);
+  }
+
+  private showActionToast(title: string, detail: string, tone: 'success' | 'error' = 'success'): void {
+    const item: HomeToast = { id: ++this.toastSequence, icon: tone === 'success' ? 'check_circle' : 'error', title, detail };
+    this.homeToasts = [...this.homeToasts.slice(-2), item];
+    setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 2200);
   }
 
   private translateClimateStatus(value: string): string {

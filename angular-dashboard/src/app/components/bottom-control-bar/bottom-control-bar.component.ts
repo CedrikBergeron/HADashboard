@@ -23,6 +23,7 @@ export interface BottomControlItem {
   sliderStep?: number;
   active?: boolean;
   lastSliderValue?: number;
+  pending?: boolean;
 }
 
 @Component({
@@ -167,6 +168,7 @@ export class BottomControlBarComponent {
       return '';
     }
 
-    return String(item.value);
+    const value = String(item.value);
+    return ({ off: 'Éteint', on: 'Allumé', unavailable: 'Indisponible', unknown: 'Inconnu' } as Record<string, string>)[value.toLowerCase()] ?? value;
   }
 }

@@ -14,7 +14,8 @@
     <div class="menu-wrapper" [class.floor-transition-a]="floorAnimationAlternate" [class.floor-transition-b]="!floorAnimationAlternate">
       @for (item of visibleItems; track item.value) {
       <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)">
-        <span>{{ item.label }}</span>
+        <span class="material-symbols-outlined nav-room-icon" aria-hidden="true">{{ item.icon || 'meeting_room' }}</span>
+        <span class="nav-room-label">{{ item.label }}</span>
       </button>
       }
     </div>

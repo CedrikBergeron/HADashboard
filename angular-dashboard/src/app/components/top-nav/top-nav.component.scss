@@ -20,7 +20,8 @@
     0 10px 28px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   margin-top: 12px;
   gap: 18px;
@@ -51,7 +52,12 @@
     transform 140ms ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  border-radius: 8px;
 }
+
+.nav-btn:focus { outline: none; }
+.nav-btn:focus-visible { box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+.nav-room-icon { display: none; font-size: 18px; }
 
 .nav-btn span {
   pointer-events: none;
@@ -109,7 +115,12 @@
   justify-content: center;
   align-items: center;
   gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
 }
+.menu-wrapper::-webkit-scrollbar { display: none; }
 
 .icon-wrap {
   appearance: none;
@@ -298,13 +309,20 @@
 }
 
 @media (max-width: 1100px) {
+  .topbar { padding-inline: 18px; }
   .nav {
-    gap: 12px;
+    gap: 8px;
   }
 
   .nav-btn {
-    padding: 0 16px;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 0 11px;
+    font-size: .78rem;
   }
+
+  .nav-room-icon { display: inline-block; }
+  .menu-wrapper { justify-content: flex-start; }
 
   .temperature {
     font-size: 1rem;
@@ -312,23 +330,19 @@
 }
 
 @media (max-width: 800px) {
-  .topbar {
-    height: auto;
-  }
+  .topbar { height: 70px; padding: 7px 10px 0; }
+  .nav { margin-top: 8px; padding: 5px 8px; gap: 6px; }
+  .temperature { padding-inline: 2px; font-size: .88rem; }
+  .menu-wrapper { justify-content: flex-start; }
+  .nav-btn { min-height: 40px; padding: 0 10px; }
+  .nav-room-label { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+  .action-cluster { gap: 6px; }
+  .floor-badge { width: 36px; padding: 0; justify-content: center; }
+  .floor-badge-label, .floor-badge-arrow { display: none; }
+  .action-chip { width: 34px; height: 34px; }
+}
 
-  .nav {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .menu-wrapper {
-    order: 2;
-    width: 100%;
-    overflow-x: auto;
-    justify-content: flex-start;
-  }
-
-  .action-cluster {
-    order: 3;
-  }
+@media (max-width: 560px) {
+  .nav-room-label { display: none; }
+  .nav-btn { width: 42px; padding: 0; }
 }

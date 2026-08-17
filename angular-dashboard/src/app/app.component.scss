@@ -121,6 +121,41 @@
   animation: backdropFadeOut 280ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+.control-detail-sheet {
+  position: absolute;
+  z-index: 14;
+  right: 40px;
+  bottom: 34px;
+  width: min(390px, calc(100vw - 48px));
+  box-sizing: border-box;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 24px;
+  background: rgba(34,37,42,.68);
+  color: #fff;
+  backdrop-filter: blur(34px) saturate(145%);
+  -webkit-backdrop-filter: blur(34px) saturate(145%);
+  box-shadow: 0 28px 80px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.12);
+  animation: controlDetailIn 320ms cubic-bezier(.22,1,.36,1) both;
+}
+.control-detail-sheet header { display: grid; grid-template-columns: 46px 1fr 34px; align-items: center; gap: 13px; }
+.control-detail-sheet header > span { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: rgba(255,255,255,.1); font-size: 24px; }
+.control-detail-sheet header div { min-width: 0; }
+.control-detail-sheet header small { color: rgba(255,255,255,.46); font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; }
+.control-detail-sheet h2 { overflow: hidden; margin: 3px 0 2px; font-size: 1.05rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.control-detail-sheet header p { margin: 0; color: rgba(255,255,255,.6); font-size: .7rem; }
+.control-detail-sheet header button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255,255,255,.08); color: #fff; cursor: pointer; }
+.control-detail-sheet header button span { font-size: 18px; }
+.control-detail-slider { display: grid; gap: 12px; margin-top: 24px; padding: 16px; border-radius: 16px; background: rgba(255,255,255,.065); }
+.control-detail-slider div { display: flex; justify-content: space-between; color: rgba(255,255,255,.62); font-size: .72rem; }.control-detail-slider strong { color: #fff; }
+.control-detail-slider input { width: 100%; accent-color: #fff; }
+.control-detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.control-detail-actions button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(255,255,255,.11); border-radius: 14px; background: rgba(255,255,255,.06); color: #fff; font: 600 .72rem inherit; cursor: pointer; }
+.control-detail-actions button.primary { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.16); }.control-detail-actions span { font-size: 18px; }
+@keyframes controlDetailIn { from { opacity: 0; transform: translateY(18px) scale(.97); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+
+@media (max-width: 700px) { .control-detail-sheet { right: 14px; bottom: 20px; left: 14px; width: auto; border-radius: 22px; } }
+
 .hero-climate-wrap {
   position: absolute;
   left: 40px;
@@ -573,6 +608,9 @@
 .summary-metrics article > span { color: rgba(255,255,255,.65); font-size: 17px; }
 .summary-metrics strong { color: #fff; font-size: .82rem; font-weight: 600; }
 .summary-metrics small { color: rgba(255,255,255,.5); font-size: .62rem; }
+.overview-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.overview-quick-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid rgba(255,255,255,.11); border-radius: 999px; background: rgba(255,255,255,.06); color: rgba(255,255,255,.86); font: 600 .65rem inherit; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
+.overview-quick-actions button:hover { background: rgba(255,255,255,.12); }.overview-quick-actions button:active { transform: scale(.97); }.overview-quick-actions span { font-size: 16px; }
 .offline-strip { display: flex; align-items: center; gap: 8px; width: fit-content; padding: 8px 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(20,22,26,.26); color: #fff; }
 .offline-strip > span { color: rgba(255,255,255,.55); font-size: 17px; }.offline-strip div { display: grid; gap: 1px; }.offline-strip strong { font-size: .67rem; }.offline-strip small { color: rgba(255,255,255,.43); font-size: .59rem; }
 .home-overview .overview-hint { text-align: left; }

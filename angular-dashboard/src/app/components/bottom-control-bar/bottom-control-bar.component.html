@@ -6,6 +6,7 @@
         class="control-card"
         [class.slider-card]="item.hasSlider"
         [class.active]="item.active"
+        [class.pending]="item.pending"
         (pointerdown)="startLongPress(item)"
         (pointerup)="cancelLongPress()"
         (pointerleave)="cancelLongPress()"
@@ -22,7 +23,7 @@
             </div>
 
             <div class="icon-wrap" aria-hidden="true">
-              <span class="material-symbols-outlined icon">{{ item.icon }}</span>
+              <span class="material-symbols-outlined icon">{{ item.pending ? 'progress_activity' : item.icon }}</span>
             </div>
           </div>
 
