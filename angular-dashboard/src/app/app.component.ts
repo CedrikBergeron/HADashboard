@@ -242,6 +242,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   hassSetupRequired = false;
   hassNoticeDismissed = false;
   dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Rez-de-chaussée', icon: 'stairs' }, { id: 'basement', name: 'Sous-sol', icon: 'stairs_2' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
     return this.navItems.flatMap((nav) => {
@@ -275,13 +276,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   get unlockedCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('lock.') && ['unlocked','unlocking'].includes(entity.state)).length; }
   get openAccessCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on' && ['door','window','garage_door','opening'].includes(String(entity.attributes['device_class']))).length; }
   get homeStatusLabel(): string { return this.unlockedCount || this.openAccessCount ? 'Attention requise' : 'Maison en ordre'; }
-  get quickActions(): DashboardControlItem[] {
-    return Object.values(this.latestEntities)
-      .filter((entity) => entity.entity_id.startsWith('scene.') || entity.entity_id.startsWith('script.'))
-      .slice(0, 4)
-      .map((entity) => ({ id: entity.entity_id, entityId: entity.entity_id, name: String(entity.attributes['friendly_name'] || this.humanizeEntityId(entity.entity_id)), icon: entity.entity_id.startsWith('scene.') ? 'scene' : 'play_arrow', domain: entity.entity_id.split('.')[0], state: entity.state, value: '', active: false, clickable: true }));
-  }
-
   get weatherState(): HassEntityState | undefined { return Object.values(this.latestEntities).find((entity) => entity.entity_id.startsWith('weather.')); }
   get weatherTemperature(): string { const value = this.weatherState?.attributes?.['temperature']; return value === undefined ? '--' : `${Math.round(Number(value))}°`; }
   get weatherLabel(): string {
@@ -458,12 +452,14 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   async saveAdminRooms(payload: AdminSavePayload): Promise<void> {
-    const { rooms, floors, settings } = payload;
+    const { rooms, floors, settings, deviceDefaultFloorId } = payload;
     this.adminRoomsOverride = rooms.map((room) => ({ ...room }));
     this.dashboardSettings = { ...settings };
     this.applyInterfaceSettings();
     if (!this.screensaverActive) this.resetInactivityTimer();
     this.dashboardFloors = floors.map((floor) => ({ ...floor }));
+    this.deviceDefaultFloorId = deviceDefaultFloorId || floors[0]?.id || 'main';
+    localStorage.setItem('ha-dashboard-default-floor', this.deviceDefaultFloorId);
     this.dashboardPresenceInitialized = false;
     if (!settings.screensaverEntityId) {
       this.dashboardPresenceActive = true;
@@ -782,7 +778,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private showHomeOverview(): void {
-    this.lastRoomValue = this.activeRoomValue === '__overview__' ? this.lastRoomValue : this.activeRoomValue;
+    const defaultRoom = this.navItems.find((item) => item.floor === this.deviceDefaultFloorId && item.value);
+    this.lastRoomValue = defaultRoom?.value ?? (this.activeRoomValue === '__overview__' ? this.lastRoomValue : this.activeRoomValue);
     this.activeRoomValue = '__overview__';
     this.activeControls = [];
     this.currentRoomClimate = null;

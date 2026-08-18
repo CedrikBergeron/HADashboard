@@ -18,6 +18,7 @@
   <app-top-nav
     [items]="navItems"
     [floors]="dashboardFloors"
+    [defaultFloor]="deviceDefaultFloorId"
     [time]="now"
     [actionChip]="vacuumActionChip"
     (clockLongPress)="onClockLongPress()"
@@ -29,7 +30,6 @@
     <main class="home-overview">
       <header class="overview-heading"><div><span>Vue globale</span><h1>{{ dashboardSettings.homeName || 'La maison' }}</h1><p>{{ currentDateLabel }}</p></div><section class="overview-weather"><span class="material-symbols-outlined">{{ weatherIcon }}</span><div><strong>{{ weatherTemperature }}</strong><small>{{ weatherLabel }}</small></div></section></header>
       <section class="overview-summary"><div class="summary-metrics"><article><span class="material-symbols-outlined">lightbulb</span><strong>{{ lightsOnCount }}</strong><small>allumée{{ lightsOnCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">door_front</span><strong>{{ openAccessCount }}</strong><small>ouverte{{ openAccessCount > 1 ? 's' : '' }}</small></article><article><span class="material-symbols-outlined">lock</span><strong>{{ unlockedCount }}</strong><small>déverrouillée{{ unlockedCount > 1 ? 's' : '' }}</small></article></div></section>
-      @if (quickActions.length) { <section class="overview-quick-actions" aria-label="Actions rapides">@for (action of quickActions; track action.id) { <button type="button" (click)="onControlClick(action)"><span class="material-symbols-outlined">{{ action.icon }}</span>{{ action.name }}</button> }</section> }
       @if (!hassConnected) { <div class="offline-strip"><span class="material-symbols-outlined">cloud_off</span><div><strong>Mode hors ligne</strong><small>Affichage des derniers états connus. Reconnexion automatique en cours.</small></div></div> }
       <p class="overview-hint">Choisissez une pièce dans la barre supérieure pour continuer.</p>
     </main>
@@ -124,7 +124,7 @@
   }
 
   @if (adminPanelOpen) {
-    <app-admin-panel [rooms]="adminRoomsForEditor" [floors]="dashboardFloors" [entities]="adminEntityOptions" [settings]="dashboardSettings" (close)="closeAdmin()" (save)="saveAdminRooms($event)"></app-admin-panel>
+    <app-admin-panel [rooms]="adminRoomsForEditor" [floors]="dashboardFloors" [entities]="adminEntityOptions" [settings]="dashboardSettings" [deviceDefaultFloorId]="deviceDefaultFloorId" (close)="closeAdmin()" (save)="saveAdminRooms($event)"></app-admin-panel>
     @if (adminSaveError) { <div class="admin-save-error">{{ adminSaveError }}</div> }
   }
   @if (hassSetupRequired && !hassNoticeDismissed && !adminUnlockOpen && !adminPanelOpen) { <div class="hass-notice"><span class="material-symbols-outlined">cloud_off</span><div><strong>Home Assistant déconnecté</strong><small>Maintenez l’heure pour mettre à jour la connexion.</small></div><button type="button" (click)="hassNoticeDismissed = true"><span class="material-symbols-outlined">close</span></button></div> }

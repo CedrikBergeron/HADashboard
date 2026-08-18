@@ -21,7 +21,7 @@
     "glassOpacity": 1,
     "reducedMotion": false,
     "clock24h": true,
-    "tabletMode": false,
+    "tabletMode": true,
     "inactivityMinutes": 1
   },
   "rooms": [

@@ -21,7 +21,7 @@ export interface AdminRoomControl { id: string; label: string; entityId: string;
 export interface AdminRoomBackground { url: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number; }
 
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
-export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; }
+export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
 
 @Component({
   selector: 'app-admin-panel',
@@ -36,6 +36,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Input() entities: AdminEntityOption[] = [];
   @Input() floors: DashboardFloor[] = [];
   @Input() settings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  @Input() deviceDefaultFloorId = 'main';
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
@@ -51,6 +52,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   favoriteIcons: string[] = [];
   iconLimit = 300;
   draftSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  draftDeviceDefaultFloorId = 'main';
   newPin = '';
   confirmPin = '';
   pinMessage = '';
@@ -100,6 +102,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     }
     if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings };
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
+    if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
   }
 
   get selectedRoom(): AdminRoom | undefined {
@@ -239,7 +242,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   }
 
   saveChanges(): void {
-    this.save.emit({ rooms: this.draftRooms.map((room) => ({ ...room })), floors: this.draftFloors.map((floor) => ({ ...floor })), settings: { ...this.draftSettings } });
+    this.save.emit({ rooms: this.draftRooms.map((room) => ({ ...room })), floors: this.draftFloors.map((floor) => ({ ...floor })), settings: { ...this.draftSettings }, deviceDefaultFloorId: this.draftDeviceDefaultFloorId });
     this.saveState = 'saved';
   }
 

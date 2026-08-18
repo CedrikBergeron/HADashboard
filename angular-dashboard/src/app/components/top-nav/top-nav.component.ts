@@ -26,6 +26,8 @@ export class TopNavComponent {
     if (activeItem?.floor && (!this.pendingFloor || activeItem.floor === this.pendingFloor)) {
       this.currentFloor = activeItem.floor;
       this.pendingFloor = null;
+    } else if (!activeItem && !this.pendingFloor) {
+      this.currentFloor = this._defaultFloor;
     }
   }
 
@@ -35,6 +37,12 @@ export class TopNavComponent {
 
   @Input() time = '';
   @Input() floors: Array<{ id: string; name: string; icon: string }> = [];
+  private _defaultFloor = 'main';
+  @Input()
+  set defaultFloor(value: string) {
+    this._defaultFloor = value || 'main';
+    if (!this.items.some((item) => item.active)) this.currentFloor = this._defaultFloor;
+  }
   @Input() actionChip: TopNavActionChip | null = null;
   @Output() itemClick = new EventEmitter<NavItem>();
   @Output() actionChipClick = new EventEmitter<void>();

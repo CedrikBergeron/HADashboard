@@ -608,9 +608,6 @@
 .summary-metrics article > span { color: rgba(255,255,255,.65); font-size: 17px; }
 .summary-metrics strong { color: #fff; font-size: .82rem; font-weight: 600; }
 .summary-metrics small { color: rgba(255,255,255,.5); font-size: .62rem; }
-.overview-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.overview-quick-actions button { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid rgba(255,255,255,.11); border-radius: 999px; background: rgba(255,255,255,.06); color: rgba(255,255,255,.86); font: 600 .65rem inherit; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
-.overview-quick-actions button:hover { background: rgba(255,255,255,.12); }.overview-quick-actions button:active { transform: scale(.97); }.overview-quick-actions span { font-size: 16px; }
 .offline-strip { display: flex; align-items: center; gap: 8px; width: fit-content; padding: 8px 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(20,22,26,.26); color: #fff; }
 .offline-strip > span { color: rgba(255,255,255,.55); font-size: 17px; }.offline-strip div { display: grid; gap: 1px; }.offline-strip strong { font-size: .67rem; }.offline-strip small { color: rgba(255,255,255,.43); font-size: .59rem; }
 .home-overview .overview-hint { text-align: left; }
