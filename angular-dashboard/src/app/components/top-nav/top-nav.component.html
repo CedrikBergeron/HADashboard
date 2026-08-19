@@ -21,6 +21,9 @@
     </div>
 
     <div class="action-cluster">
+      @if (securityAvailable) {
+        <button type="button" class="security-chip" [class.active]="securityActive" (click)="securityClick.emit()" aria-label="Ouvrir le centre de sécurité"><span class="material-symbols-outlined">shield</span></button>
+      }
       @if (actionChip) {
         <button
           type="button"

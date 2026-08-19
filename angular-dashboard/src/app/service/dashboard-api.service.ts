@@ -5,7 +5,9 @@ import type { AdminRoom } from '../components/admin-panel/admin-panel.component'
 
 type StoredRoom = { id: string; name: string; floor: 'main' | 'basement'; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
 export type NotificationPreferences = { security: boolean; safety: boolean; criticalDevices: boolean; system: boolean; durationSeconds: number };
-export type DashboardSettings = { homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number; notifications: NotificationPreferences };
+export type SecurityCamera = { entityId: string; name: string; zone: 'exterior' | 'entrance' | 'interior' };
+export type SecurityPreferences = { enabled: boolean; cameras: SecurityCamera[]; doorbellEntityId: string; doorbellCameraEntityId: string; doorLockEntityId: string; entryLightEntityId: string; doorbellDurationSeconds: number };
+export type DashboardSettings = { homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number; notifications: NotificationPreferences; security: SecurityPreferences };
 export type DashboardFloor = { id: string; name: string; icon: string };
 export type SystemHealth = { status: string; uptime: number; node: string; homeReadable: boolean; sessions: number; now: string };
 export type DashboardBackup = { id: string; createdAt: string; size: number };
@@ -76,6 +78,15 @@ export class DashboardApiService {
           criticalDevices: home.settings?.notifications?.criticalDevices !== false,
           system: home.settings?.notifications?.system !== false,
           durationSeconds: Number(home.settings?.notifications?.durationSeconds ?? 5)
+        },
+        security: {
+          enabled: home.settings?.security?.enabled === true,
+          cameras: Array.isArray(home.settings?.security?.cameras) ? home.settings!.security!.cameras.map((camera) => ({ entityId: String(camera.entityId || ''), name: String(camera.name || 'Caméra'), zone: ['entrance','interior'].includes(camera.zone) ? camera.zone : 'exterior' })) : [],
+          doorbellEntityId: String(home.settings?.security?.doorbellEntityId || ''),
+          doorbellCameraEntityId: String(home.settings?.security?.doorbellCameraEntityId || ''),
+          doorLockEntityId: String(home.settings?.security?.doorLockEntityId || ''),
+          entryLightEntityId: String(home.settings?.security?.entryLightEntityId || ''),
+          doorbellDurationSeconds: Number(home.settings?.security?.doorbellDurationSeconds ?? 25)
         }
       }
     };
@@ -111,6 +122,11 @@ export class DashboardApiService {
 
   assetUrl(url: string): string {
     return url.startsWith('/uploads/') && location.port === '4200' ? `http://localhost:3000${url}` : url;
+  }
+
+  cameraSnapshotUrl(entityId: string): string {
+    const path = `${this.baseUrl}/home-assistant/camera/${encodeURIComponent(entityId)}`;
+    return path;
   }
 
   async uploadRoomBackground(roomId: string, dataUrl: string): Promise<string> {

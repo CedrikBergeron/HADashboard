@@ -231,6 +231,16 @@ async function api(req, res, url) {
   }
   const device = await deviceAccess(req);
   if (!device.allowed) return json(res, 401, { error: 'Appareil non autorisé', code: 'DEVICE_UNAUTHORIZED' });
+  const cameraMatch = url.pathname.match(/^\/api\/home-assistant\/camera\/(camera\.[a-zA-Z0-9_]+)$/);
+  if (cameraMatch && req.method === 'GET') {
+    const secret = await hassSecret();
+    if (!secret) return json(res, 503, { error: 'Home Assistant non configuré' });
+    const response = await fetch(`${secret.url.replace(/\/$/, '')}/api/camera_proxy/${cameraMatch[1]}`, { headers: { authorization: `Bearer ${secret.token}` }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return json(res, response.status, { error: 'Image caméra indisponible' });
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.writeHead(200, { 'content-type': response.headers.get('content-type') || 'image/jpeg', 'cache-control': 'no-store, max-age=0' });
+    return res.end(buffer);
+  }
   if (req.method === 'GET' && url.pathname === '/api/home-assistant/status') return json(res, 200, await testHomeAssistant());
   if (req.method === 'PUT' && url.pathname === '/api/home-assistant/config') {
     if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });

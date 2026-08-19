@@ -22,7 +22,7 @@ export interface AdminRoomBackground { url: string; positionX: number; positionY
 
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
-const DEFAULT_SETTINGS: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 } };
+const DEFAULT_SETTINGS: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
 
 @Component({
   selector: 'app-admin-panel',
@@ -41,7 +41,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
-  activeSection: 'rooms' | 'security' | 'notifications' | 'connection' | 'system' | 'appearance' = 'rooms';
+  activeSection: 'rooms' | 'security' | 'video' | 'notifications' | 'connection' | 'system' | 'appearance' = 'rooms';
   draftRooms: AdminRoom[] = [];
   draftFloors: DashboardFloor[] = [];
   selectedRoomId = '';
@@ -60,7 +60,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   pinSaving = false;
   entityPickerOpen = false;
   entityQuery = '';
-  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' = 'presence';
+  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' | 'securityCamera' | 'doorbell' | 'doorbellCamera' | 'doorLock' | 'entryLight' = 'presence';
   entityPickerControlIndex = -1;
   iconPickerControlIndex = -1;
   backgroundUploading = false;
@@ -130,7 +130,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
       this.selectedRoomId = this.draftRooms[0]?.id ?? '';
       this.draftInitialized = true;
     }
-    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications } };
+    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications }, security: { ...DEFAULT_SETTINGS.security, ...this.settings.security, cameras: (this.settings.security?.cameras || []).map((camera) => ({ ...camera })) } };
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
     if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
   }
@@ -169,7 +169,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   get visibleEntities(): AdminEntityOption[] {
     const query = this.normalizeSearch(this.entityQuery);
     const domain = (id: string) => id.split('.')[0];
-    const allowed = this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
+    const allowed = ['securityCamera','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'doorLock' ? ['lock'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
     const scoped = allowed ? this.entities.filter((entity) => allowed.includes(domain(entity.entityId))) : this.entities;
     if (!query) return scoped.slice(0, 250);
     return scoped.filter((entity) => this.normalizeSearch(`${entity.name} ${entity.entityId} ${entity.state}`).includes(query)).slice(0, 250);
@@ -207,6 +207,11 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   }
 
   isEntitySelected(entityId: string): boolean {
+    if (this.entityPickerMode === 'securityCamera') return this.draftSettings.security.cameras[this.entityPickerControlIndex]?.entityId === entityId;
+    if (this.entityPickerMode === 'doorbell') return this.draftSettings.security.doorbellEntityId === entityId;
+    if (this.entityPickerMode === 'doorbellCamera') return this.draftSettings.security.doorbellCameraEntityId === entityId;
+    if (this.entityPickerMode === 'doorLock') return this.draftSettings.security.doorLockEntityId === entityId;
+    if (this.entityPickerMode === 'entryLight') return this.draftSettings.security.entryLightEntityId === entityId;
     if (this.entityPickerMode === 'presence') return this.draftSettings.screensaverEntityId === entityId;
     if (this.entityPickerMode === 'climate') return this.selectedRoom?.climate?.entityId === entityId;
     if (this.entityPickerMode === 'vacuum') return this.selectedRoom?.vacuum?.entityId === entityId;
@@ -369,7 +374,12 @@ export class AdminPanelComponent implements OnChanges, OnInit {
 
   selectPresenceEntity(entityId: string): void {
     const room = this.selectedRoom;
-    if (this.entityPickerMode === 'presence') this.draftSettings.screensaverEntityId = entityId;
+    if (this.entityPickerMode === 'securityCamera' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].entityId = entityId;
+    else if (this.entityPickerMode === 'doorbell') this.draftSettings.security.doorbellEntityId = entityId;
+    else if (this.entityPickerMode === 'doorbellCamera') this.draftSettings.security.doorbellCameraEntityId = entityId;
+    else if (this.entityPickerMode === 'doorLock') this.draftSettings.security.doorLockEntityId = entityId;
+    else if (this.entityPickerMode === 'entryLight') this.draftSettings.security.entryLightEntityId = entityId;
+    else if (this.entityPickerMode === 'presence') this.draftSettings.screensaverEntityId = entityId;
     else if (room && this.entityPickerMode === 'climate' && room.climate) room.climate.entityId = entityId;
     else if (room && this.entityPickerMode === 'vacuum' && room.vacuum) room.vacuum.entityId = entityId;
     else if (room && this.entityPickerMode === 'control' && room.controls?.[this.entityPickerControlIndex]) room.controls[this.entityPickerControlIndex].entityId = entityId;
@@ -389,6 +399,9 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     this.iconPickerControlIndex = index;
     void this.openIconPicker();
   }
+
+  addSecurityCamera(): void { this.draftSettings.security.cameras.push({ entityId: '', name: `Caméra ${this.draftSettings.security.cameras.length + 1}`, zone: 'exterior' }); this.saveState = 'idle'; }
+  removeSecurityCamera(index: number): void { this.draftSettings.security.cameras.splice(index, 1); this.saveState = 'idle'; }
 
   addControl(): void {
     const room = this.selectedRoom;

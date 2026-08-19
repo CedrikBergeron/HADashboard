@@ -8,7 +8,7 @@ import {
 } from './components/bottom-control-bar/bottom-control-bar.component';
 import { NavItem } from './models/NavItem';
 import { AdminEntityOption, AdminPanelComponent, AdminRoom, AdminSavePayload } from './components/admin-panel/admin-panel.component';
-import { DashboardApiService, DashboardFloor, DashboardSettings } from './service/dashboard-api.service';
+import { DashboardApiService, DashboardFloor, DashboardSettings, SecurityCamera } from './service/dashboard-api.service';
 import {
   HassAreaRegistryEntry,
   HassDeviceRegistryEntry,
@@ -192,6 +192,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private readonly subscriptions = new Subscription();
   private toastSequence = 0;
   private notificationsInitialized = false;
+  private previousDoorbellMarker = '';
+  private doorbellTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private previousImportantStates: Record<string, string> = {};
   private climateDialPointerId: number | null = null;
   private climateCommitTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -247,7 +249,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   activationBusy = false;
   hassSetupRequired = false;
   hassNoticeDismissed = false;
-  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 } };
+  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+  securityCenterOpen = false;
+  securityZone: 'all' | SecurityCamera['zone'] = 'all';
+  selectedSecurityCamera = 0;
+  doorbellOpen = false;
   deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Rez-de-chaussée', icon: 'stairs' }, { id: 'basement', name: 'Sous-sol', icon: 'stairs_2' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
@@ -292,6 +298,16 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     }
     return ids;
   }
+  get visibleSecurityCameras(): SecurityCamera[] { const cameras = this.dashboardSettings.security.cameras.filter((camera) => camera.entityId); return this.securityZone === 'all' ? cameras : cameras.filter((camera) => camera.zone === this.securityZone); }
+  get activeSecurityCamera(): SecurityCamera | undefined { return this.visibleSecurityCameras[Math.min(this.selectedSecurityCamera, Math.max(0, this.visibleSecurityCameras.length - 1))]; }
+  cameraSnapshotUrl(entityId: string): string { return this.dashboardApi.cameraSnapshotUrl(entityId); }
+  entityLabelForDashboard(entityId: string): string { return String(this.latestEntities[entityId]?.attributes?.['friendly_name'] || 'Entrée principale'); }
+  setSecurityZone(zone: typeof this.securityZone): void { this.securityZone = zone; this.selectedSecurityCamera = 0; }
+  toggleSecurityCenter(): void { this.securityCenterOpen = !this.securityCenterOpen; if (this.securityCenterOpen) { this.closeClimatePopout(); this.closeVacuumSheet(); } }
+  closeSecurityCenter(): void { this.securityCenterOpen = false; }
+  closeDoorbell(): void { this.doorbellOpen = false; if (this.doorbellTimeoutId) clearTimeout(this.doorbellTimeoutId); this.doorbellTimeoutId = null; }
+  async unlockDoorFromDoorbell(): Promise<void> { const id = this.dashboardSettings.security.doorLockEntityId; if (!id || !window.confirm('Déverrouiller la porte?')) return; try { await this.hass.callService('lock','unlock',id); this.closeDoorbell(); } catch { this.showActionToast('Porte','Le déverrouillage a échoué','error'); } }
+  async turnOnEntryLight(): Promise<void> { const id = this.dashboardSettings.security.entryLightEntityId; if (!id) return; try { await this.hass.callService(id.split('.')[0],'turn_on',id); } catch { this.showActionToast('Éclairage','La commande a échoué','error'); } }
   get weatherState(): HassEntityState | undefined { return Object.values(this.latestEntities).find((entity) => entity.entity_id.startsWith('weather.')); }
   get weatherTemperature(): string { const value = this.weatherState?.attributes?.['temperature']; return value === undefined ? '--' : `${Math.round(Number(value))}°`; }
   get weatherLabel(): string {
@@ -357,6 +373,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.adminSessionTimeoutId) clearTimeout(this.adminSessionTimeoutId);
+    if (this.doorbellTimeoutId) clearTimeout(this.doorbellTimeoutId);
     if (this.clockIntervalId) {
       clearInterval(this.clockIntervalId);
       this.clockIntervalId = null;
@@ -1741,6 +1758,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   private updateHomeNotifications(entities: Record<string, HassEntityState>): void {
     const preferences = this.dashboardSettings.notifications;
+    const doorbellId = this.dashboardSettings.security.enabled ? this.dashboardSettings.security.doorbellEntityId : '';
+    const doorbell = doorbellId ? entities[doorbellId] : undefined;
+    if (doorbell) {
+      const marker = `${doorbell.state}:${doorbell.last_updated || doorbell.last_changed || ''}`;
+      const active = doorbell.entity_id.startsWith('event.') ? !['unknown','unavailable'].includes(doorbell.state) : ['on','pressed','ringing','detected'].includes(doorbell.state);
+      if (this.previousDoorbellMarker && marker !== this.previousDoorbellMarker && active) {
+        this.doorbellOpen = true;
+        if (this.doorbellTimeoutId) clearTimeout(this.doorbellTimeoutId);
+        this.doorbellTimeoutId = setTimeout(() => this.closeDoorbell(), this.dashboardSettings.security.doorbellDurationSeconds * 1000);
+      }
+      this.previousDoorbellMarker = marker;
+    }
     const dashboardEntities = this.importantDashboardEntityIds;
     const important = Object.values(entities).filter((entity) => {
       const domain = entity.entity_id.split('.')[0];

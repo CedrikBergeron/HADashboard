@@ -44,8 +44,11 @@ export class TopNavComponent {
     if (!this.items.some((item) => item.active)) this.currentFloor = this._defaultFloor;
   }
   @Input() actionChip: TopNavActionChip | null = null;
+  @Input() securityAvailable = false;
+  @Input() securityActive = false;
   @Output() itemClick = new EventEmitter<NavItem>();
   @Output() actionChipClick = new EventEmitter<void>();
+  @Output() securityClick = new EventEmitter<void>();
   @Output() clockLongPress = new EventEmitter<void>();
 
   currentFloor = 'main';

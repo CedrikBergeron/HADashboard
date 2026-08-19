@@ -21,9 +21,12 @@
     [defaultFloor]="deviceDefaultFloorId"
     [time]="now"
     [actionChip]="vacuumActionChip"
+    [securityAvailable]="dashboardSettings.security.enabled && visibleSecurityCameras.length > 0"
+    [securityActive]="securityCenterOpen"
     (clockLongPress)="onClockLongPress()"
     (itemClick)="onNavClick($event)"
-    (actionChipClick)="onVacuumChipClick()">
+    (actionChipClick)="onVacuumChipClick()"
+    (securityClick)="toggleSecurityCenter()">
   </app-top-nav>
 
   @if (overviewActive && !screensaverActive) {
@@ -100,6 +103,17 @@
     </div>
   }
 
+  @if (securityCenterOpen) {
+    <button type="button" class="security-backdrop" (click)="closeSecurityCenter()" aria-label="Fermer le centre de sécurité"></button>
+    <section class="security-center" aria-label="Centre de sécurité">
+      <header><div><small>Résidence</small><h2>Centre de sécurité</h2></div><button type="button" (click)="closeSecurityCenter()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></header>
+      <nav class="security-filters"><button type="button" [class.active]="securityZone === 'all'" (click)="setSecurityZone('all')">Toutes</button><button type="button" [class.active]="securityZone === 'entrance'" (click)="setSecurityZone('entrance')">Entrées</button><button type="button" [class.active]="securityZone === 'exterior'" (click)="setSecurityZone('exterior')">Extérieur</button><button type="button" [class.active]="securityZone === 'interior'" (click)="setSecurityZone('interior')">Intérieur</button></nav>
+      @if (activeSecurityCamera; as camera) { <div class="security-primary"><img [src]="cameraSnapshotUrl(camera.entityId)" [alt]="camera.name"><div><span class="live-dot"></span><strong>{{ camera.name }}</strong><small>{{ camera.zone === 'entrance' ? 'Entrée' : camera.zone === 'interior' ? 'Intérieur' : 'Extérieur' }}</small></div></div> } @else { <div class="security-empty"><span class="material-symbols-outlined">videocam_off</span>Aucune caméra dans cette zone</div> }
+      <div class="security-thumbnails">@for (camera of visibleSecurityCameras; track camera.entityId; let index = $index) { <button type="button" [class.active]="selectedSecurityCamera === index" (click)="selectedSecurityCamera = index"><img [src]="cameraSnapshotUrl(camera.entityId)" alt=""><span>{{ camera.name }}</span></button> }</div>
+      <footer><span><i></i>{{ hassConnected ? 'Système opérationnel' : 'Connexion interrompue' }}</span><small>{{ visibleSecurityCameras.length }} caméra{{ visibleSecurityCameras.length > 1 ? 's' : '' }}</small></footer>
+    </section>
+  }
+
   <app-bottom-control-bar
     class="bottom-control-host"
     [class.is-hidden]="!controlsVisible"
@@ -118,6 +132,16 @@
         @if (activationError) { <span class="admin-pin-error">{{ activationError }}</span> }
         <button type="submit" [disabled]="activationBusy || activationCode.length < 4">{{ activationBusy ? 'Vérification…' : 'Autoriser' }}</button>
       </form>
+    </div>
+  }
+
+  @if (doorbellOpen) {
+    <div class="doorbell-backdrop">
+      <section class="doorbell-card" aria-label="Quelqu’un est à la porte">
+        <div class="doorbell-visual">@if (dashboardSettings.security.doorbellCameraEntityId) { <img [src]="cameraSnapshotUrl(dashboardSettings.security.doorbellCameraEntityId)" alt="Caméra de la porte"> }<div class="doorbell-live"><span></span>À la porte</div><button type="button" (click)="closeDoorbell()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="doorbell-copy"><small>Sonnette</small><h2>Quelqu’un est à la porte</h2><p>{{ entityLabelForDashboard(dashboardSettings.security.doorbellCameraEntityId) }}</p></div>
+        <div class="doorbell-actions">@if (dashboardSettings.security.entryLightEntityId) { <button type="button" (click)="turnOnEntryLight()"><span class="material-symbols-outlined">lightbulb</span>Éclairer</button> } @if (dashboardSettings.security.doorLockEntityId) { <button type="button" class="primary" (click)="unlockDoorFromDoorbell()"><span class="material-symbols-outlined">lock_open</span>Déverrouiller</button> }<button type="button" (click)="closeDoorbell()"><span class="material-symbols-outlined">close</span>Ignorer</button></div>
+      </section>
     </div>
   }
 
