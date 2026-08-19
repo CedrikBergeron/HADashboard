@@ -21,6 +21,7 @@ export interface AdminRoomControl { id: string; label: string; entityId: string;
 export interface AdminRoomBackground { url: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number; }
 
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
+type TechnicalHealthGroup = { id: string; label: string; icon: string; total: number; healthy: number; issues: AdminEntityOption[]; detail: string };
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
 const DEFAULT_SETTINGS: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
 
@@ -178,6 +179,25 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   get selectedPresenceEntity(): AdminEntityOption | undefined {
     return this.entities.find((entity) => entity.entityId === this.draftSettings.screensaverEntityId);
   }
+
+  get technicalHealthGroups(): TechnicalHealthGroup[] {
+    const normalized = (entity: AdminEntityOption) => `${entity.entityId} ${entity.name}`.toLowerCase();
+    const unavailable = (entity: AdminEntityOption) => ['unavailable','unknown','offline','not_connected','problem','bad','failed','failure','critical','warning','fault'].includes(String(entity.state).toLowerCase());
+    const definitions = [
+      { id: 'protect', label: 'Vidéo et NVR', icon: 'videocam', detail: 'Caméras, stockage et enregistrement', matches: (entity: AdminEntityOption) => entity.entityId.startsWith('camera.') || /unifi protect|nvr|network video|disk health|recording/.test(normalized(entity)) },
+      { id: 'network', label: 'Réseau UniFi', icon: 'lan', detail: 'Passerelle, switches et points d’accès', matches: (entity: AdminEntityOption) => /unifi|ubiquiti|dream machine|gateway|access point|\buap\b|\busw\b/.test(normalized(entity)) && !entity.entityId.startsWith('camera.') },
+      { id: 'power', label: 'Alimentation', icon: 'battery_charging_full', detail: 'UPS, batterie et alimentation du rack', matches: (entity: AdminEntityOption) => /\bups\b|battery backup|onduleur|power failure|mains power/.test(normalized(entity)) },
+      { id: 'rack', label: 'Environnement du rack', icon: 'device_thermostat', detail: 'Température, humidité et ventilation', matches: (entity: AdminEntityOption) => /rack|server room|salle.*serveur|cabinet/.test(normalized(entity)) && /temperature|humidity|fan|ventil|thermal/.test(normalized(entity)) }
+    ];
+    return definitions.map((definition) => {
+      const rows = this.entities.filter(definition.matches);
+      const issues = rows.filter(unavailable);
+      return { id: definition.id, label: definition.label, icon: definition.icon, detail: definition.detail, total: rows.length, healthy: rows.length - issues.length, issues };
+    });
+  }
+
+  get technicalIssues(): AdminEntityOption[] { return this.technicalHealthGroups.flatMap((group) => group.issues).filter((entity, index, all) => all.findIndex((candidate) => candidate.entityId === entity.entityId) === index); }
+  get technicalHealthConfigured(): boolean { return this.technicalHealthGroups.some((group) => group.total > 0); }
 
   entityLabel(entityId: string): string {
     return this.entities.find((entity) => entity.entityId === entityId)?.name || entityId || 'Choisir une entité';

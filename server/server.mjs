@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile, writeFile, rename, mkdir, copyFile, stat, readdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, mkdir, copyFile, stat, readdir, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { randomBytes, timingSafeEqual, scrypt as scryptCallback, createHash } from 'node:crypto';
@@ -24,8 +24,20 @@ const failedAttempts = new Map();
 const deviceCookie = 'ha_dashboard_device';
 const iconSource = 'https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints';
 const fallbackIcons = ['home','apartment','cottage','door_front','meeting_room','weekend','chair','bed','bedroom_parent','kitchen','countertops','dining','table_restaurant','bathroom','shower','bathtub','stairs_2','garage_home','deck','yard','lightbulb','floor_lamp','fluorescent','mode_fan','thermostat','heat_pump','ac_unit','water_heater','humidity_percentage','lock','lock_open','door_sensor','shield','security','sensors','motion_sensor_active','videocam','tv','speaker','router','wifi','electrical_services','power','outlet','blinds','curtains','vacuum','cleaning_services','local_laundry_service','dishwasher','oven','microwave','coffee_maker','scene','palette','settings','toggle_on'];
+const backupRetentionMs = 30 * 24 * 60 * 60_000;
 
 await Promise.all([homesDir, backupsDir, cacheDir, secretsDir, uploadsDir].map((dir) => mkdir(dir, { recursive: true })));
+
+async function pruneOldBackups() {
+  const cutoff = Date.now() - backupRetentionMs;
+  const files = await readdir(backupsDir);
+  await Promise.all(files.filter((file) => file.endsWith('.json')).map(async (file) => {
+    const path = join(backupsDir, file);
+    try { if ((await stat(path)).mtimeMs < cutoff) await unlink(path); } catch {}
+  }));
+}
+
+await pruneOldBackups();
 
 async function adminSecret() {
   try { return JSON.parse(await readFile(join(secretsDir, 'admin.json'), 'utf8')); } catch { return null; }
@@ -190,6 +202,7 @@ async function saveHome(id, value) {
   const temporary = `${target}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   await rename(temporary, target);
+  await pruneOldBackups();
 }
 
 async function iconCatalog() {
