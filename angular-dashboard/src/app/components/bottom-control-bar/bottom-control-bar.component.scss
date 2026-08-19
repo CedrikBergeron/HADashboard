@@ -52,14 +52,14 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   color: #fff;
   padding: 34px 34px 28px;
-  border-radius: 10px;
+  border-radius: 20px;
   text-align: left;
   cursor: pointer;
   scroll-snap-align: start;
   overflow: hidden;
   transition:
-    transform 140ms ease,
-    box-shadow 140ms ease;
+    transform 90ms ease-out,
+    box-shadow 220ms ease;
 }
 
 .control-card::before {
@@ -94,7 +94,8 @@
 }
 
 .control-card:active {
-  transform: scale(0.988);
+  transform: scale(0.965);
+  transition-duration: 70ms;
 }
 
 .control-card.active {
