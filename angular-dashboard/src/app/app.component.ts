@@ -247,7 +247,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   activationBusy = false;
   hassSetupRequired = false;
   hassNoticeDismissed = false;
-  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 } };
   deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Rez-de-chaussée', icon: 'stairs' }, { id: 'basement', name: 'Sous-sol', icon: 'stairs_2' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
@@ -282,6 +282,16 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   get unlockedCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('lock.') && ['unlocked','unlocking'].includes(entity.state)).length; }
   get openAccessCount(): number { return Object.values(this.latestEntities).filter((entity) => entity.entity_id.startsWith('binary_sensor.') && entity.state === 'on' && ['door','window','garage_door','opening'].includes(String(entity.attributes['device_class']))).length; }
   get homeStatusLabel(): string { return this.unlockedCount || this.openAccessCount ? 'Attention requise' : 'Maison en ordre'; }
+  get homeSecure(): boolean { return this.unlockedCount === 0 && this.openAccessCount === 0; }
+  private get importantDashboardEntityIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const room of this.adminRoomsOverride || []) {
+      for (const control of room.controls || []) if (control.entityId) ids.add(control.entityId);
+      if (room.climate?.enabled && room.climate.entityId) ids.add(room.climate.entityId);
+      if (room.vacuum?.enabled && room.vacuum.entityId) ids.add(room.vacuum.entityId);
+    }
+    return ids;
+  }
   get weatherState(): HassEntityState | undefined { return Object.values(this.latestEntities).find((entity) => entity.entity_id.startsWith('weather.')); }
   get weatherTemperature(): string { const value = this.weatherState?.attributes?.['temperature']; return value === undefined ? '--' : `${Math.round(Number(value))}°`; }
   get weatherLabel(): string {
@@ -1730,10 +1740,15 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private updateHomeNotifications(entities: Record<string, HassEntityState>): void {
+    const preferences = this.dashboardSettings.notifications;
+    const dashboardEntities = this.importantDashboardEntityIds;
     const important = Object.values(entities).filter((entity) => {
       const domain = entity.entity_id.split('.')[0];
       const deviceClass = String(entity.attributes['device_class'] || '');
-      return domain === 'lock' || (domain === 'binary_sensor' && ['door','window','garage_door','opening'].includes(deviceClass)) || ['unavailable','unknown'].includes(entity.state);
+      const security = preferences.security && (domain === 'lock' || (domain === 'binary_sensor' && ['door','window','garage_door','opening'].includes(deviceClass)));
+      const safety = preferences.safety && domain === 'binary_sensor' && ['smoke','carbon_monoxide','gas','moisture','safety'].includes(deviceClass);
+      const criticalDevice = preferences.criticalDevices && dashboardEntities.has(entity.entity_id) && ['unavailable','unknown'].includes(entity.state);
+      return security || safety || criticalDevice;
     });
     if (!this.notificationsInitialized) {
       for (const entity of important) this.previousImportantStates[entity.entity_id] = entity.state;
@@ -1752,12 +1767,14 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       if (toast) {
         const item = { ...toast, id: ++this.toastSequence };
         this.homeToasts = [...this.homeToasts.slice(-2), item];
-        setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 5000);
+        const safetyAlert = ['smoke','carbon_monoxide','gas','moisture','safety'].includes(String(entity.attributes['device_class'] || ''));
+        setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), (safetyAlert ? 12 : preferences.durationSeconds) * 1000);
       }
     }
   }
 
   private showOfflineToast(): void {
+    if (!this.dashboardSettings.notifications.system) return;
     const item: HomeToast = { id: ++this.toastSequence, icon: 'cloud_off', title: 'Mode hors ligne', detail: 'Cette action sera disponible après la reconnexion.' };
     this.homeToasts = [...this.homeToasts.slice(-2), item];
     setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 3500);

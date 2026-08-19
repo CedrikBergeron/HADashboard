@@ -114,7 +114,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0;
+  gap: 6px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -322,7 +322,7 @@
   }
 
   .nav-room-icon { display: inline-block; }
-  .menu-wrapper { justify-content: flex-start; }
+  .menu-wrapper { justify-content: flex-start; gap: 4px; }
 
   .temperature {
     font-size: 1rem;
@@ -333,7 +333,7 @@
   .topbar { height: 70px; padding: 7px 10px 0; }
   .nav { margin-top: 8px; padding: 5px 8px; gap: 6px; }
   .temperature { padding-inline: 2px; font-size: .88rem; }
-  .menu-wrapper { justify-content: flex-start; }
+  .menu-wrapper { justify-content: flex-start; gap: 3px; }
   .nav-btn { min-height: 40px; padding: 0 10px; }
   .nav-room-label { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
   .action-cluster { gap: 6px; }
@@ -343,6 +343,7 @@
 }
 
 @media (max-width: 560px) {
+  .menu-wrapper { gap: 4px; }
   .nav-room-label { display: none; }
   .nav-btn { width: 42px; padding: 0; }
 }

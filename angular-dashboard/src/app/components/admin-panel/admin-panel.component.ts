@@ -22,6 +22,7 @@ export interface AdminRoomBackground { url: string; positionX: number; positionY
 
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
+const DEFAULT_SETTINGS: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 } };
 
 @Component({
   selector: 'app-admin-panel',
@@ -35,12 +36,12 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Input() rooms: NavItem[] = [];
   @Input() entities: AdminEntityOption[] = [];
   @Input() floors: DashboardFloor[] = [];
-  @Input() settings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  @Input() settings: DashboardSettings = DEFAULT_SETTINGS;
   @Input() deviceDefaultFloorId = 'main';
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
-  activeSection: 'rooms' | 'security' | 'connection' | 'system' | 'appearance' = 'rooms';
+  activeSection: 'rooms' | 'security' | 'notifications' | 'connection' | 'system' | 'appearance' = 'rooms';
   draftRooms: AdminRoom[] = [];
   draftFloors: DashboardFloor[] = [];
   selectedRoomId = '';
@@ -51,7 +52,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   iconsLoading = false;
   favoriteIcons: string[] = [];
   iconLimit = 300;
-  draftSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
+  draftSettings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
   draftDeviceDefaultFloorId = 'main';
   newPin = '';
   confirmPin = '';
@@ -129,7 +130,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
       this.selectedRoomId = this.draftRooms[0]?.id ?? '';
       this.draftInitialized = true;
     }
-    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings };
+    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications } };
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
     if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
   }

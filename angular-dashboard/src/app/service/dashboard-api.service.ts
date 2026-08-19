@@ -4,7 +4,8 @@ import { firstValueFrom } from 'rxjs';
 import type { AdminRoom } from '../components/admin-panel/admin-panel.component';
 
 type StoredRoom = { id: string; name: string; floor: 'main' | 'basement'; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
-export type DashboardSettings = { homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number };
+export type NotificationPreferences = { security: boolean; safety: boolean; criticalDevices: boolean; system: boolean; durationSeconds: number };
+export type DashboardSettings = { homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number; notifications: NotificationPreferences };
 export type DashboardFloor = { id: string; name: string; icon: string };
 export type SystemHealth = { status: string; uptime: number; node: string; homeReadable: boolean; sessions: number; now: string };
 export type DashboardBackup = { id: string; createdAt: string; size: number };
@@ -68,7 +69,14 @@ export class DashboardApiService {
         screensaverActiveState: home.settings?.screensaverActiveState || 'on',
         fontScale: Number(home.settings?.fontScale ?? 1), glassOpacity: Number(home.settings?.glassOpacity ?? 1),
         reducedMotion: home.settings?.reducedMotion === true, clock24h: home.settings?.clock24h !== false,
-        tabletMode: home.settings?.tabletMode === true, inactivityMinutes: Number(home.settings?.inactivityMinutes ?? 5)
+        tabletMode: home.settings?.tabletMode === true, inactivityMinutes: Number(home.settings?.inactivityMinutes ?? 5),
+        notifications: {
+          security: home.settings?.notifications?.security !== false,
+          safety: home.settings?.notifications?.safety !== false,
+          criticalDevices: home.settings?.notifications?.criticalDevices !== false,
+          system: home.settings?.notifications?.system !== false,
+          durationSeconds: Number(home.settings?.notifications?.durationSeconds ?? 5)
+        }
       }
     };
   }

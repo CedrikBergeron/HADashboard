@@ -621,6 +621,7 @@
 .summary-metrics article > span { color: rgba(255,255,255,.65); font-size: 17px; }
 .summary-metrics strong { color: #fff; font-size: .82rem; font-weight: 600; }
 .summary-metrics small { color: rgba(255,255,255,.5); font-size: .62rem; }
+.summary-metrics article.secure > span { color: #8ee2b2; }.summary-metrics article.secure strong { font-size: .72rem; }.summary-metrics article.warning > span { color: #ffd08a; }.summary-metrics article.danger > span { color: #ff9a9a; }
 .offline-strip { display: flex; align-items: center; gap: 8px; width: fit-content; padding: 8px 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(20,22,26,.26); color: #fff; }
 .offline-strip > span { color: rgba(255,255,255,.55); font-size: 17px; }.offline-strip div { display: grid; gap: 1px; }.offline-strip strong { font-size: .67rem; }.offline-strip small { color: rgba(255,255,255,.43); font-size: .59rem; }
 .home-overview .overview-hint { text-align: left; }
