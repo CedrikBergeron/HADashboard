@@ -41,7 +41,7 @@
 
   @if (currentRoomClimate) {
     <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible">
-      <button type="button" class="hero-climate" (click)="toggleClimatePopout()">
+      <button type="button" class="hero-climate" [class.is-concealed]="isClimatePopoutVisible" (click)="toggleClimatePopout()">
         <div class="hero-climate-main">
           <span class="material-symbols-outlined hero-climate-icon">device_thermostat</span>
           <div class="hero-climate-copy">
@@ -109,6 +109,18 @@
     (itemLongPress)="onControlLongPress($event)"
     (sliderChange)="onSliderChange($event)">
   </app-bottom-control-bar>
+
+  @if (deviceAuthorized === false) {
+    <div class="device-activation-backdrop">
+      <form class="device-activation" (submit)="$event.preventDefault(); activateDevice()">
+        <div class="device-activation-icon"><span class="material-symbols-outlined">shield_lock</span></div><small>HA Dashboard</small><h1>Autoriser cet écran</h1><p>Entrez un code temporaire ou le NIP administrateur.</p>
+        <label>Nom de l’écran<input [(ngModel)]="activationName" name="deviceName" maxlength="50" autocomplete="off"></label>
+        <label>Code ou NIP<input [(ngModel)]="activationCode" name="activationCode" inputmode="numeric" maxlength="8" autocomplete="one-time-code"></label>
+        @if (activationError) { <span class="admin-pin-error">{{ activationError }}</span> }
+        <button type="submit" [disabled]="activationBusy || activationCode.length < 4">{{ activationBusy ? 'Vérification…' : 'Autoriser' }}</button>
+      </form>
+    </div>
+  }
 
   @if (adminUnlockOpen) {
     <div class="admin-unlock-backdrop" (click)="closeAdmin()">

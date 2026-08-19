@@ -1,4 +1,5 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { combineLatest, Subscription } from 'rxjs';
 import { TopNavActionChip, TopNavComponent } from './components/top-nav/top-nav.component';
 import {
@@ -177,7 +178,7 @@ const ROOM_BACKGROUND_BY_VALUE: Record<string, string> = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [TopNavComponent, BottomControlBarComponent, AdminPanelComponent],
+  imports: [FormsModule, TopNavComponent, BottomControlBarComponent, AdminPanelComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -239,6 +240,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   adminPinValue = '';
   adminPinError = '';
   adminSaveError = '';
+  deviceAuthorized: boolean | null = null;
+  activationCode = '';
+  activationName = 'Tablette murale';
+  activationError = '';
+  activationBusy = false;
   hassSetupRequired = false;
   hassNoticeDismissed = false;
   dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5 };
@@ -302,6 +308,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   constructor(private readonly hass: HassService, private readonly dashboardApi: DashboardApiService) {}
 
   ngOnInit(): void {
+    void this.checkDeviceAccess();
     void this.loadSavedHome();
     void this.dashboardApi.getHassStatus().then((status) => this.hassSetupRequired = !status.connected).catch(() => this.hassSetupRequired = true);
     this.setActiveRoom(this.navItems.find((nav) => nav.active)?.value ?? 'entree');
@@ -324,6 +331,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       })
     );
     this.subscriptions.add(this.hass.connected$.subscribe((connected) => this.hassConnected = connected));
+  }
+
+  async checkDeviceAccess(): Promise<void> {
+    try { this.deviceAuthorized = (await this.dashboardApi.getDeviceStatus()).authorized; }
+    catch { this.deviceAuthorized = true; }
+  }
+
+  async activateDevice(): Promise<void> {
+    this.activationBusy = true; this.activationError = '';
+    try { await this.dashboardApi.activateDevice(this.activationCode, this.activationName); this.deviceAuthorized = true; location.reload(); }
+    catch { this.activationError = 'Code ou NIP invalide.'; }
+    finally { this.activationBusy = false; }
   }
 
   ngOnDestroy(): void {
@@ -411,8 +430,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.adminUnlockOpen = false;
       this.adminPanelOpen = true;
       this.refreshAdminSession();
-    } catch {
-      this.adminPinError = 'NIP incorrect ou serveur indisponible';
+    } catch (error: any) {
+      this.adminPinError = error?.error?.error || (error?.status === 0 ? 'Serveur indisponible' : 'Impossible de vérifier le NIP');
     }
   }
 

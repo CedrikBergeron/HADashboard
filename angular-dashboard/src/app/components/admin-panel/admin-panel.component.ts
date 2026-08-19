@@ -3,7 +3,7 @@ import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChange
 import { FormsModule } from '@angular/forms';
 import { NavItem } from '../../models/NavItem';
 import { DashboardApiService } from '../../service/dashboard-api.service';
-import type { DashboardBackup, DashboardFloor, DashboardSettings, HassConnectionStatus, SystemHealth } from '../../service/dashboard-api.service';
+import type { DashboardBackup, DashboardDevice, DashboardFloor, DashboardSettings, HassConnectionStatus, SystemHealth } from '../../service/dashboard-api.service';
 
 export interface AdminRoom {
   id: string;
@@ -76,11 +76,40 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   hassToken = '';
   hassSaving = false;
   hassMessage = '';
+  devices: DashboardDevice[] = [];
+  deviceName = 'Tablette principale';
+  pairingCode = '';
+  deviceMessage = '';
+  devicesLoading = false;
 
   constructor(private readonly api: DashboardApiService) {}
 
   ngOnInit(): void {
     try { this.favoriteIcons = JSON.parse(localStorage.getItem('dashboard-favorite-icons') || '[]'); } catch {}
+    void this.loadDevices();
+  }
+
+  async loadDevices(): Promise<void> {
+    this.devicesLoading = true;
+    try { this.devices = await this.api.getDevices(); } catch { this.deviceMessage = 'Impossible de charger les appareils.'; }
+    finally { this.devicesLoading = false; }
+  }
+
+  async trustCurrentDevice(): Promise<void> {
+    this.deviceMessage = '';
+    try { await this.api.trustCurrentDevice(this.deviceName); this.deviceMessage = 'Cet appareil est maintenant autorisé.'; await this.loadDevices(); }
+    catch { this.deviceMessage = 'Impossible d’autoriser cet appareil.'; }
+  }
+
+  async createPairingCode(): Promise<void> {
+    try { this.pairingCode = await this.api.createPairingCode(); this.deviceMessage = 'Code valide pendant 10 minutes.'; }
+    catch { this.deviceMessage = 'Impossible de créer un code.'; }
+  }
+
+  async revokeDevice(device: DashboardDevice): Promise<void> {
+    if (!window.confirm(`Révoquer l’accès de « ${device.name} »?`)) return;
+    try { await this.api.revokeDevice(device.id); await this.loadDevices(); }
+    catch { this.deviceMessage = 'La révocation a échoué.'; }
   }
 
   ngOnChanges(changes: SimpleChanges): void {

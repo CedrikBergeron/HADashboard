@@ -103,6 +103,7 @@
 .hass-notice { position: fixed; z-index: 20; left: 50%; top: 98px; transform: translateX(-50%); display: grid; grid-template-columns: 30px 1fr 28px; align-items: center; gap: 10px; min-width: 320px; padding: 11px 12px; border: 1px solid rgba(255,190,120,.18); border-radius: 13px; background: rgba(35,29,24,.72); backdrop-filter: blur(22px) saturate(130%); box-shadow: 0 14px 40px rgba(0,0,0,.24); color: #fff; animation: floatingSheetIn .32s cubic-bezier(.22,1,.36,1); }.hass-notice > span { color: #ffc17e; font-size: 20px; }.hass-notice div { display: grid; gap: 3px; }.hass-notice strong { font-size: .75rem; }.hass-notice small { color: rgba(255,255,255,.55); font-size: .65rem; }.hass-notice button { width: 28px; height: 28px; border: 0; background: transparent; color: rgba(255,255,255,.55); cursor: pointer; }.hass-notice button span { font-size: 17px; }
 .admin-pin-error { display: block; margin-top: 9px; color: #ff8f8f; font-size: .78rem; }
 .admin-save-error { position: fixed; z-index: 60; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 11px 16px; border: 1px solid rgba(255,120,120,.24); border-radius: 10px; background: #351d20; color: #ffb0b0; font-size: .8rem; box-shadow: 0 12px 36px rgba(0,0,0,.35); }
+.device-activation-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: radial-gradient(circle at 50% 15%,#28313b 0,#111418 48%,#090b0d 100%); }.device-activation { width: min(390px,100%); box-sizing: border-box; display: grid; gap: 16px; padding: 34px; border: 1px solid rgba(255,255,255,.13); border-radius: 26px; background: rgba(24,27,31,.82); box-shadow: 0 36px 100px rgba(0,0,0,.55); backdrop-filter: blur(28px); color: #fff; }.device-activation-icon { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; background: rgba(255,255,255,.09); }.device-activation-icon span { font-size: 25px; }.device-activation > small { color: #8f99a4; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }.device-activation h1 { margin: -8px 0 0; font-size: 1.55rem; }.device-activation p { margin: -8px 0 4px; color: #929ca6; font-size: .84rem; line-height: 1.5; }.device-activation label { display: grid; gap: 7px; color: #aeb5bc; font-size: .72rem; font-weight: 600; }.device-activation input { height: 48px; box-sizing: border-box; padding: 0 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; outline: none; background: rgba(255,255,255,.055); color: #fff; font: inherit; }.device-activation label:nth-of-type(2) input { font-size: 1.3rem; font-weight: 700; letter-spacing: .2em; text-align: center; }.device-activation input:focus { border-color: rgba(255,255,255,.4); }.device-activation > button { height: 48px; border: 0; border-radius: 12px; background: #f2f4f5; color: #151719; font-weight: 700; cursor: pointer; }.device-activation > button:disabled { opacity: .45; cursor: default; }
 .admin-unlock-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 20px; }.admin-unlock-actions button { height: 42px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #d9dde1; font: 600 .82rem inherit; cursor: pointer; }.admin-unlock-actions button[type="submit"] { border-color: #eceff2; background: #eceff2; color: #111316; }
 
 .sheet-backdrop {
@@ -175,6 +176,7 @@
 .hero-climate {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
@@ -190,7 +192,15 @@
     background 160ms ease,
     border-color 160ms ease,
     transform 160ms ease,
-    opacity 160ms ease;
+    opacity 220ms ease,
+    filter 220ms ease;
+}
+
+.hero-climate.is-concealed {
+  opacity: 0;
+  transform: scale(0.94);
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 .hero-climate:hover {
@@ -238,7 +248,7 @@
 .hero-climate-popout {
   position: absolute;
   left: 0;
-  top: calc(100% + 14px);
+  top: 0;
   width: min(332px, calc(100vw - 40px));
   padding: 18px 18px 18px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -259,7 +269,7 @@
 }
 
 .hero-climate-popout.is-open {
-  animation: heroClimatePopIn 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: heroClimatePopIn 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hero-climate-popout.is-closing {
@@ -359,12 +369,14 @@
 @keyframes heroClimatePopIn {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.982);
+    transform: scale(0.72);
+    filter: blur(8px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
@@ -376,7 +388,8 @@
 
   to {
     opacity: 0;
-    transform: translateY(-8px) scale(0.985);
+    transform: scale(0.74);
+    filter: blur(6px);
   }
 }
 

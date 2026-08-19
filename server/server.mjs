@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, writeFile, rename, mkdir, copyFile, stat, readdir } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
-import { randomBytes, timingSafeEqual, scrypt as scryptCallback } from 'node:crypto';
+import { randomBytes, timingSafeEqual, scrypt as scryptCallback, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -19,6 +19,9 @@ const port = Number(process.env.PORT || 3000);
 const defaultAdminPin = process.env.ADMIN_PIN || '2580';
 const scrypt = promisify(scryptCallback);
 const sessions = new Map();
+const pairingCodes = new Map();
+const failedAttempts = new Map();
+const deviceCookie = 'ha_dashboard_device';
 const iconSource = 'https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/MaterialSymbolsOutlined%5BFILL%2CGRAD%2Copsz%2Cwght%5D.codepoints';
 const fallbackIcons = ['home','apartment','cottage','door_front','meeting_room','weekend','chair','bed','bedroom_parent','kitchen','countertops','dining','table_restaurant','bathroom','shower','bathtub','stairs_2','garage_home','deck','yard','lightbulb','floor_lamp','fluorescent','mode_fan','thermostat','heat_pump','ac_unit','water_heater','humidity_percentage','lock','lock_open','door_sensor','shield','security','sensors','motion_sensor_active','videocam','tv','speaker','router','wifi','electrical_services','power','outlet','blinds','curtains','vacuum','cleaning_services','local_laundry_service','dishwasher','oven','microwave','coffee_maker','scene','palette','settings','toggle_on'];
 
@@ -47,6 +50,58 @@ async function saveAdminPin(pin) {
   const temporary = `${target}.${process.pid}.tmp`;
   await writeFile(temporary, JSON.stringify({ salt, hash: hash.toString('hex'), updatedAt: new Date().toISOString() }), { mode: 0o600 });
   await rename(temporary, target);
+}
+
+async function deviceRegistry() {
+  try { return JSON.parse(await readFile(join(secretsDir, 'devices.json'), 'utf8')); } catch { return { devices: [] }; }
+}
+
+async function saveDeviceRegistry(registry) {
+  const target = join(secretsDir, 'devices.json');
+  const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+  await writeFile(temporary, JSON.stringify(registry, null, 2), { mode: 0o600 });
+  await rename(temporary, target);
+}
+
+function tokenHash(token) { return createHash('sha256').update(String(token || '')).digest('hex'); }
+function cookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || '').split(';').map((part) => part.trim().split('=').map(decodeURIComponent)).filter((part) => part.length === 2));
+}
+async function deviceAccess(req, touch = true) {
+  const registry = await deviceRegistry();
+  if (!registry.devices.length) return { allowed: true, bootstrap: true, registry };
+  const hash = tokenHash(cookies(req)[deviceCookie]);
+  const device = registry.devices.find((entry) => entry.tokenHash === hash && !entry.revokedAt);
+  if (!device) return { allowed: false, bootstrap: false, registry };
+  if (touch && (!device.lastSeenAt || Date.now() - new Date(device.lastSeenAt).getTime() > 60_000)) {
+    device.lastSeenAt = new Date().toISOString();
+    await saveDeviceRegistry(registry);
+  }
+  return { allowed: true, bootstrap: false, registry, device };
+}
+function deviceCookieHeader(token, req) {
+  const secure = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+  return `${deviceCookie}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=315360000${secure ? '; Secure' : ''}`;
+}
+function attemptKey(req, scope) { return `${scope}:${String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim()}`; }
+function rateLimited(req, scope, max = 8) {
+  const key = attemptKey(req, scope); const now = Date.now(); const row = failedAttempts.get(key);
+  if (!row || row.until < now) { failedAttempts.delete(key); return false; }
+  return row.count >= max;
+}
+function recordFailedAttempt(req, scope) {
+  const key = attemptKey(req, scope); const now = Date.now(); const row = failedAttempts.get(key);
+  failedAttempts.set(key, !row || row.until < now ? { count: 1, until: now + 5 * 60_000 } : { ...row, count: row.count + 1 });
+}
+function clearAttempts(req, scope) { failedAttempts.delete(attemptKey(req, scope)); }
+async function enrollDevice(req, res, name, registry = null) {
+  const token = randomBytes(32).toString('base64url');
+  const value = registry || await deviceRegistry();
+  const now = new Date().toISOString();
+  const device = { id: randomBytes(10).toString('hex'), name: String(name || 'Tablette').trim().slice(0, 50) || 'Tablette', tokenHash: tokenHash(token), createdAt: now, lastSeenAt: now };
+  value.devices.push(device);
+  await saveDeviceRegistry(value);
+  return json(res, 200, { enrolled: true, device: { id: device.id, name: device.name } }, { 'set-cookie': deviceCookieHeader(token, req) });
 }
 
 async function hassSecret() {
@@ -91,6 +146,7 @@ function allowCors(req, res) {
     res.setHeader('access-control-allow-origin', origin);
     res.setHeader('access-control-allow-headers', 'content-type,x-admin-session');
     res.setHeader('access-control-allow-methods', 'GET,PUT,POST,OPTIONS');
+    res.setHeader('access-control-allow-credentials', 'true');
   }
 }
 
@@ -157,6 +213,24 @@ async function iconCatalog() {
 }
 
 async function api(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/device/status') {
+    const access = await deviceAccess(req);
+    return json(res, 200, { authorized: access.allowed, setupRequired: !access.registry.devices.length, device: access.device ? { id: access.device.id, name: access.device.name } : null });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/device/activate') {
+    if (rateLimited(req, 'activate')) return json(res, 429, { error: 'Trop de tentatives. Réessayez dans 10 minutes.' });
+    const value = await body(req);
+    const code = String(value.code || '').replace(/\D/g, '');
+    const expiry = pairingCodes.get(code);
+    const validPairingCode = Boolean(expiry && expiry >= Date.now());
+    const validAdminPin = await verifyAdminPin(code);
+    if (!validPairingCode && !validAdminPin) { recordFailedAttempt(req, 'activate'); pairingCodes.delete(code); return json(res, 401, { error: 'Code ou NIP invalide' }); }
+    if (validPairingCode) pairingCodes.delete(code);
+    clearAttempts(req, 'activate');
+    return enrollDevice(req, res, value.name);
+  }
+  const device = await deviceAccess(req);
+  if (!device.allowed) return json(res, 401, { error: 'Appareil non autorisé', code: 'DEVICE_UNAUTHORIZED' });
   if (req.method === 'GET' && url.pathname === '/api/home-assistant/status') return json(res, 200, await testHomeAssistant());
   if (req.method === 'PUT' && url.pathname === '/api/home-assistant/config') {
     if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
@@ -175,8 +249,10 @@ async function api(req, res, url) {
     return json(res, 200, { status: homeReadable ? 'ok' : 'degraded', uptime: Math.round(process.uptime()), node: process.version, homeReadable, sessions: sessions.size, now: new Date().toISOString() });
   }
   if (req.method === 'POST' && url.pathname === '/api/admin/unlock') {
+    if (rateLimited(req, 'admin')) return json(res, 429, { error: 'Trop de tentatives. Réessayez dans 10 minutes.' });
     const value = await body(req);
-    if (!await verifyAdminPin(value.pin)) return json(res, 401, { error: 'NIP incorrect' });
+    if (!await verifyAdminPin(value.pin)) { recordFailedAttempt(req, 'admin'); return json(res, 401, { error: 'NIP incorrect' }); }
+    clearAttempts(req, 'admin');
     const token = randomBytes(32).toString('base64url');
     sessions.set(token, Date.now() + 15 * 60_000);
     return json(res, 200, { token, expiresIn: 900 });
@@ -188,6 +264,36 @@ async function api(req, res, url) {
     if (!/^\d{4,8}$/.test(pin)) return json(res, 400, { error: 'Le NIP doit contenir de 4 à 8 chiffres' });
     await saveAdminPin(pin);
     return json(res, 200, { saved: true });
+  }
+  if (req.method === 'GET' && url.pathname === '/api/admin/devices') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const registry = await deviceRegistry();
+    return json(res, 200, { devices: registry.devices.map(({ tokenHash: _, ...entry }) => entry) });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/devices/trust-current') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const value = await body(req);
+    const registry = await deviceRegistry();
+    const existing = await deviceAccess(req, false);
+    if (existing.device) return json(res, 200, { enrolled: true });
+    return enrollDevice(req, res, value.name, registry);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/pairing-code') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    let code; do { code = String(Math.floor(100000 + Math.random() * 900000)); } while (pairingCodes.has(code));
+    pairingCodes.set(code, Date.now() + 10 * 60_000);
+    return json(res, 200, { code, expiresIn: 600 });
+  }
+  const revokeMatch = url.pathname.match(/^\/api\/admin\/devices\/([a-f0-9]+)\/revoke$/);
+  if (revokeMatch && req.method === 'POST') {
+    if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    const registry = await deviceRegistry();
+    const target = registry.devices.find((entry) => entry.id === revokeMatch[1]);
+    if (!target) return json(res, 404, { error: 'Appareil introuvable' });
+    if (registry.devices.filter((entry) => !entry.revokedAt).length <= 1) return json(res, 400, { error: 'Au moins un appareil doit rester autorisé' });
+    target.revokedAt = new Date().toISOString();
+    await saveDeviceRegistry(registry);
+    return json(res, 200, { revoked: true });
   }
   if (req.method === 'GET' && url.pathname === '/api/icons') return json(res, 200, await iconCatalog());
   if (req.method === 'GET' && url.pathname === '/api/backups') {
@@ -244,6 +350,8 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (url.pathname.startsWith('/uploads/')) {
+      const access = await deviceAccess(req);
+      if (!access.allowed) return json(res, 401, { error: 'Appareil non autorisé' });
       const requestedUpload = normalize(url.pathname.replace(/^\/uploads\/+/, ''));
       if (requestedUpload.startsWith('..')) return json(res, 403, { error: 'Accès refusé' });
       const file = join(uploadsDir, requestedUpload);
@@ -268,6 +376,8 @@ const websocketServer = new WebSocketServer({ noServer: true });
 server.on('upgrade', async (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   if (url.pathname !== '/api/home-assistant/websocket') return socket.destroy();
+  const access = await deviceAccess(request, false);
+  if (!access.allowed) return socket.destroy();
   const secret = await hassSecret();
   if (!secret) return socket.destroy();
   websocketServer.handleUpgrade(request, socket, head, (client) => {

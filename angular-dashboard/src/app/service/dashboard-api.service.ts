@@ -9,6 +9,8 @@ export type DashboardFloor = { id: string; name: string; icon: string };
 export type SystemHealth = { status: string; uptime: number; node: string; homeReadable: boolean; sessions: number; now: string };
 export type DashboardBackup = { id: string; createdAt: string; size: number };
 export type HassConnectionStatus = { configured: boolean; connected: boolean; url?: string };
+export type DashboardDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; revokedAt?: string };
+export type DeviceStatus = { authorized: boolean; setupRequired: boolean; device?: { id: string; name: string } | null };
 type StoredHome = { id: string; name: string; rooms: StoredRoom[]; floors?: DashboardFloor[]; settings?: Partial<DashboardSettings> };
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +23,25 @@ export class DashboardApiService {
   async unlock(pin: string): Promise<void> {
     const response = await firstValueFrom(this.http.post<{ token: string }>(`${this.baseUrl}/admin/unlock`, { pin }));
     this.adminToken = response.token;
+  }
+
+  async getDeviceStatus(): Promise<DeviceStatus> { return await firstValueFrom(this.http.get<DeviceStatus>(`${this.baseUrl}/device/status`)); }
+  async activateDevice(code: string, name: string): Promise<void> { await firstValueFrom(this.http.post(`${this.baseUrl}/device/activate`, { code, name })); }
+  async getDevices(): Promise<DashboardDevice[]> {
+    const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
+    return (await firstValueFrom(this.http.get<{ devices: DashboardDevice[] }>(`${this.baseUrl}/admin/devices`, { headers }))).devices;
+  }
+  async trustCurrentDevice(name: string): Promise<void> {
+    const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
+    await firstValueFrom(this.http.post(`${this.baseUrl}/admin/devices/trust-current`, { name }, { headers }));
+  }
+  async createPairingCode(): Promise<string> {
+    const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
+    return (await firstValueFrom(this.http.post<{ code: string }>(`${this.baseUrl}/admin/pairing-code`, {}, { headers }))).code;
+  }
+  async revokeDevice(id: string): Promise<void> {
+    const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
+    await firstValueFrom(this.http.post(`${this.baseUrl}/admin/devices/${id}/revoke`, {}, { headers }));
   }
 
   async getHome(): Promise<{ id: string; name: string; rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings }> {
