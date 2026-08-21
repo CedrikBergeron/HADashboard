@@ -214,20 +214,20 @@
 
       <div class="sheet-actions">
         <button type="button" class="sheet-action sheet-action-primary" [disabled]="!canStartVacuum" (click)="startVacuum()">
-          Cette pièce
+          <strong>Cette pièce</strong>
         </button>
         <button
           type="button"
           class="sheet-action"
           [disabled]="!canStartVacuumForFloor"
           (click)="startVacuumForFloor()">
-          Tout l'étage
+          <strong>Tout l'étage</strong>
         </button>
         <button type="button" class="sheet-action" [disabled]="!canPauseVacuum" (click)="pauseVacuum()">
-          Pause
+          <strong>Pause</strong>
         </button>
         <button type="button" class="sheet-action" [disabled]="!canDockVacuum" (click)="dockVacuum()">
-          Retour à la base
+          <strong>Retour à la base</strong>
         </button>
       </div>
 

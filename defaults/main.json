@@ -1,0 +1,61 @@
+{
+  "id": "main",
+  "name": "Ma maison",
+  "floors": [
+    {
+      "id": "main",
+      "name": "Rez-de-chaussée",
+      "icon": "stairs"
+    }
+  ],
+  "settings": {
+    "language": "en",
+    "homeName": "Ma maison",
+    "screensaverEntityId": "",
+    "screensaverActiveState": "on",
+    "fontScale": 1,
+    "glassOpacity": 1,
+    "reducedMotion": false,
+    "clock24h": true,
+    "tabletMode": false,
+    "inactivityMinutes": 5,
+    "notifications": {
+      "security": true,
+      "safety": true,
+      "criticalDevices": true,
+      "system": true,
+      "durationSeconds": 5
+    },
+    "security": {
+      "enabled": false,
+      "cameras": [],
+      "doorbellEntityId": "",
+      "doorbellCameraEntityId": "",
+      "doorLockEntityId": "",
+      "entryLightEntityId": "",
+      "doorbellDurationSeconds": 25
+    }
+  },
+  "rooms": [
+    {
+      "id": "salon",
+      "name": "Salon",
+      "floor": "main",
+      "icon": {
+        "name": "weekend",
+        "style": "outlined",
+        "filled": false
+      },
+      "controls": [],
+      "climate": {
+        "enabled": false,
+        "entityId": ""
+      },
+      "vacuum": {
+        "enabled": false,
+        "entityId": "",
+        "roomParameter": ""
+      }
+    }
+  ]
+}
