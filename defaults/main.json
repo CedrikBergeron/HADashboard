@@ -1,16 +1,16 @@
 {
   "id": "main",
-  "name": "Ma maison",
+  "name": "My home",
   "floors": [
     {
       "id": "main",
-      "name": "Rez-de-chaussée",
-      "icon": "stairs"
+      "name": "Main floor",
+      "icon": "home"
     }
   ],
   "settings": {
     "language": "en",
-    "homeName": "Ma maison",
+    "homeName": "My home",
     "screensaverEntityId": "",
     "screensaverActiveState": "on",
     "fontScale": 1,
@@ -38,11 +38,11 @@
   },
   "rooms": [
     {
-      "id": "salon",
-      "name": "Salon",
+      "id": "room",
+      "name": "Room",
       "floor": "main",
       "icon": {
-        "name": "weekend",
+        "name": "meeting_room",
         "style": "outlined",
         "filled": false
       },

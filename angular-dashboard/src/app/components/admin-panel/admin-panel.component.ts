@@ -23,7 +23,7 @@ export interface AdminRoomBackground { url: string; positionX: number; positionY
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
 type TechnicalHealthGroup = { id: string; label: string; icon: string; total: number; healthy: number; issues: AdminEntityOption[]; detail: string };
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
-const DEFAULT_SETTINGS: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+const DEFAULT_SETTINGS: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
 
 @Component({
   selector: 'app-admin-panel',

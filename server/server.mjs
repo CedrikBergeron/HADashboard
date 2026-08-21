@@ -9,6 +9,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)));
 const dataDir = join(root, 'data');
+const defaultsDir = join(root, 'defaults');
 const homesDir = join(dataDir, 'homes');
 const backupsDir = join(dataDir, 'backups');
 const cacheDir = join(dataDir, 'cache');
@@ -191,7 +192,17 @@ async function listBackups(homeId = 'main') {
 
 async function readHome(id = 'main') {
   const safeId = id.replace(/[^a-z0-9-]/g, '');
-  return JSON.parse(await readFile(join(homesDir, `${safeId}.json`), 'utf8'));
+  const target = join(homesDir, `${safeId}.json`);
+  try {
+    return JSON.parse(await readFile(target, 'utf8'));
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+    const initial = JSON.parse(await readFile(join(defaultsDir, `${safeId}.json`), 'utf8'));
+    await writeFile(target, `${JSON.stringify(initial, null, 2)}\n`, { mode: 0o600, flag: 'wx' }).catch((writeError) => {
+      if (writeError?.code !== 'EEXIST') throw writeError;
+    });
+    return JSON.parse(await readFile(target, 'utf8'));
+  }
 }
 
 async function saveHome(id, value) {

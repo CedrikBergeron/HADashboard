@@ -7,4 +7,6 @@ data/backups
 data/cache
 data/secrets
 data/uploads
+data/homes
+angular-dashboard/public/assets
 npm-debug.log*

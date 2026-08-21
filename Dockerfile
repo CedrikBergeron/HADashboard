@@ -23,7 +23,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY server ./server
-COPY data ./defaults
+COPY defaults ./defaults
 COPY --from=build /build/angular-dashboard/dist ./angular-dashboard/dist
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh

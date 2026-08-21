@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 
-mkdir -p /data/dashboard
+mkdir -p /data/dashboard/homes
 
 if [ ! -f /data/dashboard/homes/main.json ]; then
-  cp -R /app/defaults/. /data/dashboard/
+  cp /app/defaults/main.json /data/dashboard/homes/main.json
 fi
 
 rm -rf /app/data

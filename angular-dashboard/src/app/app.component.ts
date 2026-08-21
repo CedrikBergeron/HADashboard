@@ -18,7 +18,7 @@ import {
   HassServiceCatalog
 } from './service/hass.service';
 
-type Floor = 'main' | 'basement';
+type Floor = string;
 
 type DashboardControlItem = BottomControlItem & {
   entityId: string;
@@ -47,133 +47,11 @@ type RoomClimateControl = {
   status: string;
 };
 
-type RoomControlConfig = {
-  match: string[];
-  label: string;
-  icon?: string;
-  exclude?: string[];
-};
-
 type HomeAttentionItem = { icon: string; label: string; detail: string; tone: 'normal' | 'warning' | 'danger' };
 type HomeToast = { id: number; icon: string; title: string; detail: string };
 
-const ROOM_META: Record<string, { label: string; floor: Floor; order: number }> = {
-  entree: { label: 'Entrée', floor: 'main', order: 0 },
-  salon: { label: 'Salon', floor: 'main', order: 1 },
-  'salle-a-manger': { label: 'Salle à Manger', floor: 'main', order: 2 },
-  cuisine: { label: 'Cuisine', floor: 'main', order: 3 },
-  'salle-de-bain-main': { label: 'Salle de bain', floor: 'main', order: 4 },
-  'chambre-nicolas': { label: 'Chambre Nicolas', floor: 'main', order: 5 },
-  passage: { label: 'Passage', floor: 'basement', order: 6 },
-  buanderie: { label: 'Buanderie', floor: 'basement', order: 7 },
-  'salle-de-bain-basement': { label: 'Salle de bain', floor: 'basement', order: 8 },
-  'chambre-alexis': { label: 'Chambre Alexis', floor: 'basement', order: 9 },
-  'chambre-cedrik': { label: 'Chambre Cédrik', floor: 'basement', order: 10 }
-};
-
-const FALLBACK_NAV_ITEMS: NavItem[] = Object.entries(ROOM_META)
-  .sort(([, left], [, right]) => left.order - right.order)
-  .map(([value, meta], index) => ({
-    label: meta.label,
-    value,
-    floor: meta.floor,
-    active: index === 0
-  }));
-
-const MAIN_FLOOR_ROOM_VALUES = new Set([
-  'accueil',
-  'entree',
-  'salon',
-  'salle-a-manger',
-  'cuisine',
-  'salle-de-bain-main',
-  'chambre-nicolas'
-]);
-
-const HIDDEN_ROOM_VALUES = new Set([
-  'exterieur',
-  'salle-des-serveurs',
-  'terasse'
-]);
-
-const DEFAULT_ROOM_VALUE = 'entree';
-
-const VACUUM_ENTITY_BY_FLOOR: Record<string, string> = {
-  main: 'vacuum.t50_pro_omni',
-  basement: 'vacuum.michelle'
-};
-
-const T50_ROOM_CODE_BY_ROOM_VALUE: Record<string, string> = {
-  entree: '1,6;',
-  salon: '1,5;',
-  'salle-a-manger': '1,4;',
-  'chambre-nicolas': '1,3;',
-  'salle-de-bain-main': '1,2;',
-  cuisine: '1,7;'
-};
-
-const ROOM_CONTROL_CONFIG: Record<string, RoomControlConfig[]> = {
-  entree: [
-    { match: ['aqara smart lock u100'], label: 'Porte Avant' },
-    { match: ['porte avant'], label: 'Porte Avant' },
-    { match: ['lampe entree', 'lampe entrée'], label: 'Lampe Entrée' }
-  ],
-  accueil: [
-    { match: ['aqara smart lock u100'], label: 'Porte Avant' },
-    { match: ['porte avant'], label: 'Porte Avant' },
-    { match: ['lampe entree', 'lampe entrée'], label: 'Lampe Entrée' }
-  ],
-  salon: [
-    { match: ['apple tv'], label: 'Apple TV' },
-    { match: ['lampe sur pied'], label: 'Lampe sur Pied', icon: 'floor_lamp' }
-  ],
-  'salle-a-manger': [
-    { match: ['salle a manger', 'salle à manger', 'lum'], exclude: ['curtain', 'rideau', 'store'], label: 'Luminaire' },
-    { match: ['curtain curtain', 'rideau', 'store'], label: 'Rideaux', icon: 'curtains_closed' }
-  ],
-  cuisine: [
-    { match: ['cuisine'], exclude: ['comptoir'], label: 'Luminaire' },
-    { match: ['comptoir'], label: 'Comptoir', icon: 'fluorescent' }
-  ],
-  'salle-de-bain-main': [
-    { match: ['mirroir', 'mirror'], label: 'Mirroir', icon: 'bathroom' },
-    { match: ['salle de bain', 'salle-de-bain'], exclude: ['mirroir', 'mirror'], label: 'Luminaire' }
-  ],
-  'chambre-nicolas': [
-    { match: ['blanc', 'white'], label: 'Lumières Blanche', icon: 'backlight_low' },
-    { match: ['couleur', 'color', 'colour'], label: 'Lumières Couleur', icon: 'fluorescent' }
-  ],
-  'chambre-cedrik': [
-    { match: ['encastree', 'encastrée', 'encastrees', 'encastrées'], label: 'Encastrées', icon: 'fluorescent' },
-    { match: ['lampe bureau', 'bureau'], label: 'Lampe bureau' },
-    { match: ['lampe chevet', 'lampes chevet', 'chevet'], label: 'Lampes chevet' }
-  ],
-  'salle-de-bain-basement': [
-    { match: ['1'], label: 'Encastrées', icon: 'fluorescent' },
-    { match: ['douche', 'shower'], label: 'Douche', icon: 'fluorescent' }
-  ],
-  passage: [
-    {
-      match: ['passage'],
-      exclude: ['led'],
-      label: 'Encastrées',
-      icon: 'fluorescent'
-    }
-  ]
-};
-
-const ROOM_BACKGROUND_BY_VALUE: Record<string, string> = {
-  entree: 'assets/home.jpg',
-  salon: 'assets/salon.jpg',
-  'salle-a-manger': 'assets/sam.jpg',
-  cuisine: 'assets/cuisine.jpg',
-  'salle-de-bain-main': 'assets/salle-de-bain-main.png',
-  'chambre-nicolas': 'assets/chambre-nicolas.png',
-  passage: 'assets/ss.jpg',
-  'salle-de-bain-basement': 'assets/salle-de-bain-basement.png',
-  'chambre-alexis': 'assets/chambre-alexis.png',
-  'chambre-cedrik': 'assets/chambre-cedrik.png'
-};
+const FALLBACK_NAV_ITEMS: NavItem[] = [{ label: 'Room', value: 'room', floor: 'main', active: true, icon: 'meeting_room' }];
+const DEFAULT_ROOM_VALUE = 'room';
 
 @Component({
   selector: 'app-root',
@@ -216,8 +94,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   now = '19:58';
 
   navItems: NavItem[] = FALLBACK_NAV_ITEMS;
-  roomName = 'Entrée';
-  activeRoomValue = 'entree';
+  roomName = 'Room';
+  activeRoomValue = 'room';
   temperature = -3.1;
   humidity = 86;
 
@@ -249,18 +127,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   activationBusy = false;
   hassSetupRequired = false;
   hassNoticeDismissed = false;
-  dashboardSettings: DashboardSettings = { homeName: 'La maison', screensaverEntityId: 'input_boolean.dashboard', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+  dashboardSettings: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
   securityCenterOpen = false;
   securityZone: 'all' | SecurityCamera['zone'] = 'all';
   selectedSecurityCamera = 0;
   doorbellOpen = false;
   deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
-  dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Rez-de-chaussée', icon: 'stairs' }, { id: 'basement', name: 'Sous-sol', icon: 'stairs_2' }];
+  dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Main floor', icon: 'home' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
     return this.navItems.flatMap((nav) => {
       const roomValue = nav.value ?? '';
       const configured = this.adminRoomsOverride?.find((room) => room.id === roomValue)?.background;
-      const src = configured?.url ? this.dashboardApi.assetUrl(configured.url) : ROOM_BACKGROUND_BY_VALUE[roomValue];
+      const src = configured?.url ? this.dashboardApi.assetUrl(configured.url) : '';
       if (!src) return [];
       return [{ roomValue, src, positionX: configured?.positionX ?? 50, positionY: configured?.positionY ?? 50, brightness: configured?.brightness ?? .72, saturation: configured?.saturation ?? .9, contrast: configured?.contrast ?? 1.02, overlay: configured?.overlay ?? .26 }];
     });
@@ -484,15 +362,12 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     return this.navItems.map((nav) => {
       const room = this.adminRoomsOverride?.find((candidate) => candidate.id === nav.value);
       const automaticClimate = nav.value ? this.buildRoomClimate(this.latestEntityRegistry, this.latestDevices, this.latestEntities, nav.value) : null;
-      const floor = nav.floor ?? 'main';
-      const automaticVacuumId = VACUUM_ENTITY_BY_FLOOR[floor];
-      const automaticVacuumExists = Boolean(this.latestEntities[automaticVacuumId]);
       return {
         ...nav,
         controls: room?.controls ?? (this.controlsByRoom[nav.value ?? ''] ?? []).map((control) => ({ id: control.entityId, label: control.name, entityId: control.entityId, icon: control.icon })),
         climate: room?.climate ?? { enabled: Boolean(automaticClimate), entityId: automaticClimate?.entityId ?? '' },
-        vacuum: room?.vacuum ?? { enabled: automaticVacuumExists, entityId: automaticVacuumExists ? automaticVacuumId : '', roomParameter: T50_ROOM_CODE_BY_ROOM_VALUE[nav.value ?? ''] ?? '' },
-        background: room?.background ?? (ROOM_BACKGROUND_BY_VALUE[nav.value ?? ''] ? { url: ROOM_BACKGROUND_BY_VALUE[nav.value ?? ''], positionX: 50, positionY: 50, brightness: .72, saturation: .9, contrast: 1.02, overlay: .26 } : undefined)
+        vacuum: room?.vacuum ?? { enabled: false, entityId: '', roomParameter: '' },
+        background: room?.background
       };
     });
   }
@@ -990,33 +865,12 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       }));
     }
 
-    const visibleAreas = areas.filter((area) => !HIDDEN_ROOM_VALUES.has(this.slugify(area.name)));
-
-    const orderedAreas = [...visibleAreas].sort((left, right) => {
-      const leftSlug = this.slugify(left.name);
-      const rightSlug = this.slugify(right.name);
-      const leftFloor = this.getFloorForRoom(leftSlug);
-      const rightFloor = this.getFloorForRoom(rightSlug);
-      const leftOrder = ROOM_META[leftSlug]?.order ?? Number.MAX_SAFE_INTEGER;
-      const rightOrder = ROOM_META[rightSlug]?.order ?? Number.MAX_SAFE_INTEGER;
-
-      if (leftFloor !== rightFloor) {
-        return leftFloor === 'main' ? -1 : 1;
-      }
-
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder;
-      }
-
-      return left.name.localeCompare(right.name, 'fr');
-    });
+    const orderedAreas = [...areas].sort((left, right) => left.name.localeCompare(right.name));
 
     return orderedAreas.map((area, index) => {
       const slug = this.slugify(area.name);
-      const meta = ROOM_META[slug];
-
       return {
-        label: meta?.label ?? area.name,
+        label: area.name,
         value: slug,
         floor: this.getFloorForRoom(slug),
         active: slug === this.activeRoomValue || (!this.activeRoomValue && index === 0)
@@ -1037,10 +891,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
     for (const area of areas) {
       const roomSlug = this.slugify(area.name);
-      if (HIDDEN_ROOM_VALUES.has(roomSlug)) {
-        continue;
-      }
-
       areaSlugById.set(area.area_id, roomSlug);
     }
 
@@ -1071,30 +921,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       }
 
       const controlItem = this.createControlItem(entityEntry, state, services);
-      if (!controlItem) {
-        if (areaSlug === 'salle-a-manger') {
-          console.log('[sam] Ignored entity for salle a manger', {
-            entityId: entityEntry.entity_id,
-            domain: state.entity_id.split('.')[0],
-            friendlyName: state.attributes['friendly_name'],
-            state: state.state,
-            attributes: state.attributes
-          });
-        }
-        continue;
-      }
-
-      if (areaSlug === 'salle-a-manger') {
-        console.log('[sam] Control candidate for salle a manger', {
-          entityId: entityEntry.entity_id,
-          domain: controlItem.domain,
-          name: controlItem.name,
-          state: controlItem.state,
-          hasSlider: controlItem.hasSlider,
-          sliderValue: controlItem.sliderValue,
-          attributes: state.attributes
-        });
-      }
+      if (!controlItem) continue;
 
       controlsByRoom[areaSlug] = [...(controlsByRoom[areaSlug] ?? []), controlItem];
     }
@@ -1120,11 +947,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         left.name.localeCompare(right.name, 'fr')
       );
 
-      controlsByRoom[roomValue] = this.applyRoomControlConfig(roomValue, roomControls);
-
-      if (roomValue === 'salle-a-manger') {
-        console.log('[sam] Final salle a manger controls', controlsByRoom[roomValue]);
-      }
+      controlsByRoom[roomValue] = roomControls;
     }
 
     return controlsByRoom;
@@ -1133,10 +956,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private buildRoomAreaIdsByValue(areas: HassAreaRegistryEntry[]): Record<string, string> {
     return areas.reduce<Record<string, string>>((accumulator, area) => {
       const roomSlug = this.slugify(area.name);
-      if (HIDDEN_ROOM_VALUES.has(roomSlug)) {
-        return accumulator;
-      }
-
       accumulator[roomSlug] = area.area_id;
       return accumulator;
     }, {});
@@ -1847,56 +1666,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private getFloorForRoom(roomValue: string): Floor {
-    if (ROOM_META[roomValue]?.floor) {
-      return ROOM_META[roomValue].floor;
-    }
-
-    return MAIN_FLOOR_ROOM_VALUES.has(roomValue) ? 'main' : 'basement';
-  }
-
-  private applyRoomControlConfig(roomValue: string, controls: DashboardControlItem[]): DashboardControlItem[] {
-    const config = ROOM_CONTROL_CONFIG[roomValue];
-    if (!config?.length) {
-      return controls;
-    }
-
-    const normalizedControls = controls.map((control) => ({
-      control,
-      normalizedName: this.normalizeMatchValue(control.name),
-      normalizedEntityId: this.normalizeMatchValue(control.entityId)
-    }));
-
-    const configuredControls: DashboardControlItem[] = [];
-
-    for (const configItem of config) {
-      const matchers = configItem.match.map((value) => this.normalizeMatchValue(value));
-      const excludedMatchers = (configItem.exclude ?? []).map((value) => this.normalizeMatchValue(value));
-      const matchedEntry = normalizedControls.find(({ control, normalizedName, normalizedEntityId }) =>
-        !configuredControls.includes(control) &&
-        matchers.some((matcher) => normalizedName.includes(matcher) || normalizedEntityId.includes(matcher)) &&
-        !excludedMatchers.some((matcher) => normalizedName.includes(matcher) || normalizedEntityId.includes(matcher))
-      );
-
-      if (!matchedEntry) {
-        continue;
-      }
-
-      configuredControls.push({
-        ...matchedEntry.control,
-        name: configItem.label,
-        icon: configItem.icon ?? matchedEntry.control.icon
-      });
-    }
-
-    return configuredControls;
-  }
-
-  private normalizeMatchValue(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
+    return this.navItems.find((item) => item.value === roomValue)?.floor ?? this.dashboardFloors[0]?.id ?? 'main';
   }
 
   private buildVacuumControl(
@@ -1904,46 +1674,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     entities: Record<string, HassEntityState>
   ): VacuumControl | null {
     const configuredVacuum = this.adminRoomsOverride?.find((room) => room.id === this.activeRoomValue)?.vacuum;
-    if (configuredVacuum) {
-      if (!configuredVacuum.enabled || !configuredVacuum.entityId) return null;
-      const entry = entityRegistry.find((candidate) => candidate.entity_id === configuredVacuum.entityId);
-      const state = entities[configuredVacuum.entityId];
-      if (!entry || !state) return null;
-      return { entityId: state.entity_id, label: this.getDisplayName(entry, state), state: state.state, isActive: ['cleaning', 'returning', 'paused'].includes(state.state) };
-    }
-
-    const currentFloor = this.navItems.find((item) => item.value === this.activeRoomValue)?.floor ?? 'main';
-    const vacuumEntries = entityRegistry.filter((entry) => entry.entity_id.startsWith('vacuum.'));
-    const preferredEntityId = VACUUM_ENTITY_BY_FLOOR[currentFloor];
-    const vacuumEntry = vacuumEntries.find((entry) => entry.entity_id === preferredEntityId) ?? vacuumEntries[0];
-
-    if (!vacuumEntry) {
-      console.log('[vacuum] No vacuum entity found', {
-        currentFloor,
-        activeRoomValue: this.activeRoomValue
-      });
-      return null;
-    }
-
-    const vacuumState = entities[vacuumEntry.entity_id];
-    if (!vacuumState) {
-      console.log('[vacuum] Vacuum entity found but has no state', {
-        currentFloor,
-        entityId: vacuumEntry.entity_id
-      });
-      return null;
-    }
-
-    const numericAttributes = Object.fromEntries(
-      Object.entries(vacuumState.attributes).filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
-    );
-
-    return {
-      entityId: vacuumState.entity_id,
-      label: this.getDisplayName(vacuumEntry, vacuumState),
-      state: vacuumState.state,
-      isActive: ['cleaning', 'returning', 'paused'].includes(vacuumState.state)
-    };
+    if (!configuredVacuum?.enabled || !configuredVacuum.entityId) return null;
+    const entry = entityRegistry.find((candidate) => candidate.entity_id === configuredVacuum.entityId);
+    const state = entities[configuredVacuum.entityId];
+    if (!entry || !state) return null;
+    return { entityId: state.entity_id, label: this.getDisplayName(entry, state), state: state.state, isActive: ['cleaning', 'returning', 'paused'].includes(state.state) };
   }
 
   get vacuumStatusLabel(): string {
@@ -2143,11 +1878,11 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   get currentT50RoomCode(): string | undefined {
     const configured = this.adminRoomsOverride?.find((room) => room.id === this.activeRoomValue)?.vacuum?.roomParameter;
-    return configured || T50_ROOM_CODE_BY_ROOM_VALUE[this.activeRoomValue];
+    return configured || undefined;
   }
 
   get canUseT50RoomCommand(): boolean {
-    return this.vacuumControl?.entityId === 'vacuum.t50_pro_omni' && Boolean(this.currentT50RoomCode);
+    return Boolean(this.vacuumControl?.entityId && this.currentT50RoomCode);
   }
 
   get currentFloorAreaIds(): string[] {
