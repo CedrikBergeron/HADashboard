@@ -7,6 +7,7 @@ A self-hosted Angular dashboard for Home Assistant, backed by a small Node.js se
 Requires Node.js 20 or 22 LTS.
 
 ```bash
+cd cm_dashboard
 npm run dev
 ```
 
@@ -27,21 +28,22 @@ From the administration panel, connect Home Assistant with its URL and a long-li
 
 Runtime configuration is deliberately kept outside Git:
 
-- `data/homes/`: floors, rooms, entity IDs, and interface settings
-- `data/secrets/`: hashed admin PIN, authorized-device hashes, Home Assistant URL and token
-- `data/uploads/`: user-uploaded room photographs
-- `data/backups/`: automatic configuration backups
-- `data/cache/`: downloaded icon metadata
+- `cm_dashboard/data/homes/`: floors, rooms, entity IDs, and interface settings
+- `cm_dashboard/data/secrets/`: hashed admin PIN, authorized-device hashes, Home Assistant URL and token
+- `cm_dashboard/data/uploads/`: user-uploaded room photographs
+- `cm_dashboard/data/backups/`: automatic configuration backups
+- `cm_dashboard/data/cache/`: downloaded icon metadata
 
 All these paths are ignored by Git and excluded from the Docker build context. The Home Assistant token is accepted only by the Node server, saved with file mode `0600`, and never returned to the browser. The browser connects through the server-side WebSocket proxy.
 
-`defaults/main.json` is the only configuration shipped with the project. Keep it generic and free of entity IDs or personal data.
+`cm_dashboard/defaults/main.json` is the only configuration shipped with the project. Keep it generic and free of entity IDs or personal data.
 
 ## Production
 
 Build the Angular application and run the integrated server:
 
 ```bash
+cd cm_dashboard
 npm run build
 ADMIN_PIN=your-unique-pin npm start
 ```

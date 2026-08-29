@@ -10,7 +10,7 @@ RUN npm run build
 
 FROM node:22-alpine
 
-ARG BUILD_VERSION=1.4.4
+ARG BUILD_VERSION=1.4.5
 ARG BUILD_ARCH
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="app" \

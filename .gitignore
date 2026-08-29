@@ -1,9 +1,9 @@
-data/cache/
-data/backups/
-data/secrets/
-data/uploads/
-data/homes/
-angular-dashboard/public/assets/
+cm_dashboard/data/cache/
+cm_dashboard/data/backups/
+cm_dashboard/data/secrets/
+cm_dashboard/data/uploads/
+cm_dashboard/data/homes/
+cm_dashboard/angular-dashboard/public/assets/
 .env
-angular-dashboard/dist/
-angular-dashboard/node_modules/
+cm_dashboard/angular-dashboard/dist/
+cm_dashboard/angular-dashboard/node_modules/
