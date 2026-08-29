@@ -3,7 +3,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 34px;
+  bottom: calc(34px + env(safe-area-inset-bottom, 0px));
   z-index: 6;
   pointer-events: none;
 }
@@ -245,7 +245,7 @@
 
 @media (max-width: 1100px) {
   :host {
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   }
 
   .dock-scroll {

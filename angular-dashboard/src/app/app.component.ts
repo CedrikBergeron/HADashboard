@@ -65,6 +65,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private adminRoomsOverride: AdminRoom[] | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
   private roomTransitionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private pendingRoomValue: string | null = null;
   private readonly roomTransitionDurationMs = 180;
   private readonly sliderUpdateTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly subscriptions = new Subscription();
@@ -145,7 +146,17 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   get activeBackgroundOverlay(): number {
-    return this.roomBackgrounds.find((background) => background.roomValue === this.activeRoomValue)?.overlay ?? .26;
+    const overlay = this.roomBackgrounds.find((background) => background.roomValue === this.activeRoomValue)?.overlay ?? .26;
+    return this.useBrightTabletProfile ? overlay * .72 : overlay;
+  }
+
+  displayBackgroundBrightness(brightness: number): number {
+    return this.useBrightTabletProfile ? Math.min(1.25, brightness * 1.14) : brightness;
+  }
+
+  private get useBrightTabletProfile(): boolean {
+    const isIPad = navigator.maxTouchPoints > 1 && /iPad|Macintosh/.test(navigator.userAgent);
+    return this.dashboardSettings.tabletMode || isIPad;
   }
 
   get overviewActive(): boolean { return this.activeRoomValue === '__overview__'; }
@@ -311,7 +322,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   onNavClick(item: NavItem): void {
     this.resetInactivityTimer();
     const nextRoomValue = item.value ?? this.activeRoomValue;
-    if (nextRoomValue === this.activeRoomValue) {
+    if (nextRoomValue === (this.pendingRoomValue ?? this.activeRoomValue)) {
       return;
     }
 
@@ -444,6 +455,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private transitionToRoom(roomValue: string, fallbackLabel?: string, showControlsAfter = true): void {
+    this.pendingRoomValue = roomValue;
     this.navItems = this.navItems.map((navItem) => ({
       ...navItem,
       active: navItem.value === roomValue
@@ -457,6 +469,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
     this.roomTransitionTimeoutId = setTimeout(() => {
       this.setActiveRoom(roomValue, fallbackLabel);
+      this.pendingRoomValue = null;
       this.controlsVisible = showControlsAfter && !this.screensaverActive;
       this.roomTransitionTimeoutId = null;
     }, this.roomTransitionDurationMs);
@@ -829,8 +842,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const availableRoomValue = this.navItems.some((item) => item.value === this.activeRoomValue)
-      ? this.activeRoomValue
+    const selectedRoomValue = this.pendingRoomValue ?? this.activeRoomValue;
+    const availableRoomValue = this.navItems.some((item) => item.value === selectedRoomValue)
+      ? selectedRoomValue
       : this.navItems[0]?.value ?? 'entree';
 
     this.navItems = this.navItems.map((item) => ({
@@ -838,7 +852,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       active: item.value === availableRoomValue
     }));
 
-    this.setActiveRoom(availableRoomValue);
+    if (!this.pendingRoomValue) this.setActiveRoom(availableRoomValue);
   }
 
   private buildNavItems(areas: HassAreaRegistryEntry[]): NavItem[] {

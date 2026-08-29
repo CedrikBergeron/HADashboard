@@ -9,7 +9,7 @@
       class="bg-image"
       [src]="background.src"
       [style.object-position]="background.positionX + '% ' + background.positionY + '%'"
-      [style.filter]="'brightness(' + background.brightness + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"
+      [style.filter]="'brightness(' + displayBackgroundBrightness(background.brightness) + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"
       [style.opacity]="displayBackgroundRoomValue === background.roomValue ? 1 : 0"
       alt="" />
   }

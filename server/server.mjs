@@ -348,8 +348,8 @@ async function api(req, res, url) {
   if (backgroundMatch && req.method === 'POST') {
     if (!authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
     const value = await body(req, 16_000_000);
-    const match = String(value.dataUrl || '').match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
-    if (!match) return json(res, 400, { error: 'Image JPEG, PNG ou WebP requise' });
+    const match = String(value.dataUrl || '').match(/^data:image\/(jpeg|png|webp|avif|heic|heif);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return json(res, 400, { error: 'Image JPEG, PNG, WebP, AVIF ou HEIC requise' });
     const buffer = Buffer.from(match[2], 'base64');
     if (!buffer.length || buffer.length > 10_000_000) return json(res, 400, { error: 'L’image doit faire moins de 10 Mo' });
     const extension = match[1] === 'jpeg' ? 'jpg' : match[1];
@@ -375,7 +375,7 @@ async function api(req, res, url) {
   return json(res, 404, { error: 'Route introuvable' });
 }
 
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.heic': 'image/heic', '.heif': 'image/heif', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
 const server = createServer(async (req, res) => {
   allowCors(req, res);
