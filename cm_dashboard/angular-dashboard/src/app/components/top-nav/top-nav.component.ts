@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
 import { NavItem } from '../../models/NavItem';
 
 export interface TopNavActionChip {
@@ -14,19 +14,20 @@ export interface TopNavActionChip {
   templateUrl: './top-nav.component.html',
   styleUrl: './top-nav.component.scss'
 })
-export class TopNavComponent {
+export class TopNavComponent implements OnDestroy {
   private clockLongPressTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private floorTransitionTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private _items: NavItem[] = [];
   private pendingFloor: string | null = null;
 
   @Input()
   set items(value: NavItem[]) {
     this._items = value ?? [];
+    if (this.pendingFloor) return;
     const activeItem = this._items.find((item) => item.active);
-    if (activeItem?.floor && (!this.pendingFloor || activeItem.floor === this.pendingFloor)) {
+    if (activeItem?.floor) {
       this.currentFloor = activeItem.floor;
-      this.pendingFloor = null;
-    } else if (!activeItem && !this.pendingFloor) {
+    } else if (!activeItem) {
       this.currentFloor = this._defaultFloor;
     }
   }
@@ -58,7 +59,12 @@ export class TopNavComponent {
     return this.items.filter((item) => item.floor === this.currentFloor);
   }
 
+  get floorChangePending(): boolean {
+    return this.pendingFloor !== null;
+  }
+
   toggleFloor(): void {
+    if (this.pendingFloor) return;
     const available = this.floors.filter((floor) => this.items.some((item) => item.floor === floor.id));
     if (available.length < 2) return;
     const index = available.findIndex((floor) => floor.id === this.currentFloor);
@@ -79,9 +85,20 @@ export class TopNavComponent {
     this.currentFloor = targetFloor;
     this.floorAnimationAlternate = !this.floorAnimationAlternate;
     this.onItemClick(targetItem);
+
+    if (this.floorTransitionTimeoutId) clearTimeout(this.floorTransitionTimeoutId);
+    this.floorTransitionTimeoutId = setTimeout(() => {
+      this.pendingFloor = null;
+      this.floorTransitionTimeoutId = null;
+    }, 420);
   }
 
   ngOnInit(): void {
+  }
+
+  ngOnDestroy(): void {
+    this.cancelClockLongPress();
+    if (this.floorTransitionTimeoutId) clearTimeout(this.floorTransitionTimeoutId);
   }
 
   onItemClick(item: NavItem): void {

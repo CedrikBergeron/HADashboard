@@ -24,27 +24,29 @@
       @if (securityAvailable) {
         <button type="button" class="security-chip" [class.active]="securityActive" (click)="securityClick.emit()" aria-label="Ouvrir le centre de sécurité"><span class="material-symbols-outlined">shield</span></button>
       }
-      @if (actionChip) {
-        <button
-          type="button"
-          class="action-chip"
-          [class.active]="actionChip.active"
-          (click)="onActionChipClick()">
-          <span class="action-chip-icon" aria-hidden="true">
-            <svg viewBox="0 0 64 64" class="vacuum-pill-icon" focusable="false">
-              <ellipse cx="32" cy="24" rx="20" ry="8" />
-              <path d="M12 24v12c0 4.4 9 8 20 8s20-3.6 20-8V24" />
-              <ellipse cx="32" cy="22" rx="6.5" ry="2.8" />
-              <circle cx="23" cy="28" r="1.6" />
-              <circle cx="32" cy="29.5" r="1.6" />
-              <circle cx="41" cy="28" r="1.6" />
-              <path d="M32 44 22 52" />
-              <path d="M32 44 42 52" />
-            </svg>
-          </span>
-        </button>
-      }
-        <button type="button" class="floor-badge" (click)="toggleFloor()" aria-label="Changer d'étage">
+      <span class="action-chip-slot" [class.is-empty]="!actionChip">
+        @if (actionChip) {
+          <button
+            type="button"
+            class="action-chip"
+            [class.active]="actionChip.active"
+            (click)="onActionChipClick()">
+            <span class="action-chip-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" class="vacuum-pill-icon" focusable="false">
+                <ellipse cx="32" cy="24" rx="20" ry="8" />
+                <path d="M12 24v12c0 4.4 9 8 20 8s20-3.6 20-8V24" />
+                <ellipse cx="32" cy="22" rx="6.5" ry="2.8" />
+                <circle cx="23" cy="28" r="1.6" />
+                <circle cx="32" cy="29.5" r="1.6" />
+                <circle cx="41" cy="28" r="1.6" />
+                <path d="M32 44 22 52" />
+                <path d="M32 44 42 52" />
+              </svg>
+            </span>
+          </button>
+        }
+      </span>
+        <button type="button" class="floor-badge" [disabled]="floorChangePending" [attr.aria-busy]="floorChangePending" (click)="toggleFloor()" aria-label="Changer d'étage">
           <span class="material-symbols-outlined floor-badge-icon">stairs_2</span>
           <span class="floor-badge-label" [class.floor-transition-a]="floorAnimationAlternate" [class.floor-transition-b]="!floorAnimationAlternate">{{ currentFloorLabel }}</span>
           <span class="material-symbols-outlined floor-badge-arrow">{{ currentFloorArrow }}</span>

@@ -81,6 +81,7 @@ function cookies(req) {
   return Object.fromEntries(String(req.headers.cookie || '').split(';').map((part) => part.trim().split('=').map(decodeURIComponent)).filter((part) => part.length === 2));
 }
 async function deviceAccess(req, touch = true) {
+  if (process.env.DASHBOARD_DEV === '1') return { allowed: true, bootstrap: true, registry: { devices: [] } };
   const registry = await deviceRegistry();
   if (!registry.devices.length) return { allowed: true, bootstrap: true, registry };
   const hash = tokenHash(cookies(req)[deviceCookie]);
@@ -155,7 +156,11 @@ async function body(req, maxBytes = 1_000_000) {
 
 function allowCors(req, res) {
   const origin = req.headers.origin;
-  if (origin === 'http://localhost:4200' || origin === 'http://127.0.0.1:4200') {
+  let developmentOrigin = false;
+  if (process.env.DASHBOARD_DEV === '1' && origin) {
+    try { developmentOrigin = new URL(origin).port === '4200'; } catch {}
+  }
+  if (origin === 'http://localhost:4200' || origin === 'http://127.0.0.1:4200' || developmentOrigin) {
     res.setHeader('access-control-allow-origin', origin);
     res.setHeader('access-control-allow-headers', 'content-type,x-admin-session');
     res.setHeader('access-control-allow-methods', 'GET,PUT,POST,OPTIONS');
@@ -175,9 +180,28 @@ function authorized(req) {
 }
 
 function validHome(value) {
-  return value && typeof value === 'object' && Array.isArray(value.rooms) && value.rooms.every((room) =>
-    room && typeof room.id === 'string' && typeof room.name === 'string' && typeof room.floor === 'string' && /^[a-z0-9-]+$/.test(room.floor)
-  );
+  if (!value || typeof value !== 'object' || !Array.isArray(value.rooms)) return false;
+  const roomIds = new Set();
+  return value.rooms.every((room) => {
+    const valid = room && /^[a-z0-9-]+$/.test(room.id) && typeof room.name === 'string' && typeof room.floor === 'string' && /^[a-z0-9-]+$/.test(room.floor);
+    if (!valid || roomIds.has(room.id)) return false;
+    roomIds.add(room.id);
+    return true;
+  });
+}
+
+function normalizeRoomIds(home) {
+  if (!home || !Array.isArray(home.rooms)) return home;
+  const used = new Set();
+  home.rooms = home.rooms.map((room, index) => {
+    const requested = /^[a-z0-9-]+$/.test(String(room?.id || '')) ? room.id : `room-${index + 1}`;
+    let id = requested;
+    let suffix = 2;
+    while (used.has(id)) id = `${requested}-${suffix++}`;
+    used.add(id);
+    return id === room?.id ? room : { ...room, id };
+  });
+  return home;
 }
 
 async function listBackups(homeId = 'main') {
@@ -194,14 +218,14 @@ async function readHome(id = 'main') {
   const safeId = id.replace(/[^a-z0-9-]/g, '');
   const target = join(homesDir, `${safeId}.json`);
   try {
-    return JSON.parse(await readFile(target, 'utf8'));
+    return normalizeRoomIds(JSON.parse(await readFile(target, 'utf8')));
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error;
     const initial = JSON.parse(await readFile(join(defaultsDir, `${safeId}.json`), 'utf8'));
     await writeFile(target, `${JSON.stringify(initial, null, 2)}\n`, { mode: 0o600, flag: 'wx' }).catch((writeError) => {
       if (writeError?.code !== 'EEXIST') throw writeError;
     });
-    return JSON.parse(await readFile(target, 'utf8'));
+    return normalizeRoomIds(JSON.parse(await readFile(target, 'utf8')));
   }
 }
 

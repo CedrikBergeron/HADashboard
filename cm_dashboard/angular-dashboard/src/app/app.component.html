@@ -2,6 +2,7 @@
   class="page"
   [class.reduced-motion]="dashboardSettings.reducedMotion"
   [class.tablet-mode]="dashboardSettings.tabletMode"
+  [class.ipad-device]="isIPadDevice"
   [style.--glass-opacity]="dashboardSettings.glassOpacity"
   [class.is-screensaver]="screensaverActive">
   @for (background of roomBackgrounds; track background.roomValue) {
@@ -9,7 +10,7 @@
       class="bg-image"
       [src]="background.src"
       [style.object-position]="background.positionX + '% ' + background.positionY + '%'"
-      [style.filter]="'brightness(' + displayBackgroundBrightness(background.brightness) + ') saturate(' + background.saturation + ') contrast(' + background.contrast + ')'"
+      [style.filter]="'brightness(' + displayBackgroundBrightness(background.brightness) + ') saturate(' + displayBackgroundSaturation(background.saturation) + ') contrast(' + displayBackgroundContrast(background.contrast) + ')'"
       [style.opacity]="displayBackgroundRoomValue === background.roomValue ? 1 : 0"
       alt="" />
   }
@@ -159,7 +160,7 @@
   }
 
   @if (adminPanelOpen) {
-    <app-admin-panel [rooms]="adminRoomsForEditor" [floors]="dashboardFloors" [entities]="adminEntityOptions" [settings]="dashboardSettings" [deviceDefaultFloorId]="deviceDefaultFloorId" (close)="closeAdmin()" (save)="saveAdminRooms($event)"></app-admin-panel>
+    <app-admin-panel [rooms]="adminRoomsForEditor" [floors]="dashboardFloors" [entities]="adminEntityOptions" [settings]="dashboardSettings" [deviceDefaultFloorId]="deviceDefaultFloorId" [deviceDefaultRoomId]="deviceDefaultRoomId" (close)="closeAdmin()" (save)="saveAdminRooms($event)"></app-admin-panel>
     @if (adminSaveError) { <div class="admin-save-error">{{ adminSaveError }}</div> }
   }
   @if (hassSetupRequired && !hassNoticeDismissed && !adminUnlockOpen && !adminPanelOpen) { <div class="hass-notice"><span class="material-symbols-outlined">cloud_off</span><div><strong>Home Assistant déconnecté</strong><small>Maintenez l’heure pour mettre à jour la connexion.</small></div><button type="button" (click)="hassNoticeDismissed = true"><span class="material-symbols-outlined">close</span></button></div> }

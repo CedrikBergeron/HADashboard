@@ -18,7 +18,8 @@ type StoredHome = { id: string; name: string; rooms: StoredRoom[]; floors?: Dash
 
 @Injectable({ providedIn: 'root' })
 export class DashboardApiService {
-  private readonly baseUrl = location.port === '4200' ? 'http://localhost:3000/api' : '/api';
+  private readonly devServerOrigin = `${location.protocol}//${location.hostname}:3000`;
+  private readonly baseUrl = location.port === '4200' ? `${this.devServerOrigin}/api` : '/api';
   private adminToken = '';
 
   constructor(private readonly http: HttpClient) {}
@@ -122,7 +123,7 @@ export class DashboardApiService {
   }
 
   assetUrl(url: string): string {
-    return url.startsWith('/uploads/') && location.port === '4200' ? `http://localhost:3000${url}` : url;
+    return url.startsWith('/uploads/') && location.port === '4200' ? `${this.devServerOrigin}${url}` : url;
   }
 
   cameraSnapshotUrl(entityId: string): string {

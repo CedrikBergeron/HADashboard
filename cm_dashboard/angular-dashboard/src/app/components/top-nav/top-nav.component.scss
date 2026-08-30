@@ -161,6 +161,18 @@
   gap: 12px;
 }
 
+.action-chip-slot {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: block;
+}
+
+.action-chip-slot.is-empty {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .floor-badge {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -195,6 +207,10 @@
 
 .floor-badge:active {
   transform: scale(0.988);
+}
+
+.floor-badge:disabled {
+  cursor: default;
 }
 
 .floor-badge-icon,
@@ -345,6 +361,7 @@
   .floor-badge { width: 36px; padding: 0; justify-content: center; }
   .floor-badge-label, .floor-badge-arrow { display: none; }
   .action-chip { width: 34px; height: 34px; }
+  .action-chip-slot { width: 34px; height: 34px; flex-basis: 34px; }
 }
 
 @media (max-width: 560px) {

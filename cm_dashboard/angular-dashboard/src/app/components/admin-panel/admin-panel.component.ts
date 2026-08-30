@@ -22,8 +22,9 @@ export interface AdminRoomBackground { url: string; positionX: number; positionY
 
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
 type TechnicalHealthGroup = { id: string; label: string; icon: string; total: number; healthy: number; issues: AdminEntityOption[]; detail: string };
-export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; }
+export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; deviceDefaultRoomId: string; }
 const DEFAULT_SETTINGS: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+const DEFAULT_BACKGROUND_SETTINGS = { positionX: 50, positionY: 50, brightness: .72, saturation: .9, contrast: 1.02, overlay: .26 };
 
 @Component({
   selector: 'app-admin-panel',
@@ -39,6 +40,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Input() floors: DashboardFloor[] = [];
   @Input() settings: DashboardSettings = DEFAULT_SETTINGS;
   @Input() deviceDefaultFloorId = 'main';
+  @Input() deviceDefaultRoomId = '';
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
@@ -55,6 +57,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   iconLimit = 300;
   draftSettings: DashboardSettings = structuredClone(DEFAULT_SETTINGS);
   draftDeviceDefaultFloorId = 'main';
+  draftDeviceDefaultRoomId = '';
   newPin = '';
   confirmPin = '';
   pinMessage = '';
@@ -129,11 +132,13 @@ export class AdminPanelComponent implements OnChanges, OnInit {
         background: (room as NavItem & { background?: AdminRoomBackground }).background ? { ...(room as any).background } : undefined
       }));
       this.selectedRoomId = this.draftRooms[0]?.id ?? '';
+      if (!this.draftRooms.some((room) => room.id === this.draftDeviceDefaultRoomId)) this.draftDeviceDefaultRoomId = this.draftRooms[0]?.id ?? '';
       this.draftInitialized = true;
     }
     if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications }, security: { ...DEFAULT_SETTINGS.security, ...this.settings.security, cameras: (this.settings.security?.cameras || []).map((camera) => ({ ...camera })) } };
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
     if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
+    if (changes['deviceDefaultRoomId'] && changes['deviceDefaultRoomId'].firstChange) this.draftDeviceDefaultRoomId = this.deviceDefaultRoomId || this.draftRooms[0]?.id || '';
   }
 
   get selectedRoom(): AdminRoom | undefined {
@@ -219,11 +224,19 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
       const url = await this.api.uploadRoomBackground(room.id, dataUrl);
-      room.background = { url, positionX: 50, positionY: 50, brightness: .72, saturation: .9, contrast: 1.02, overlay: .26 };
+      room.background = { url, ...DEFAULT_BACKGROUND_SETTINGS };
       this.backgroundMessage = 'Image téléversée. Enregistrez pour l’appliquer.';
       this.saveState = 'idle';
     } catch { this.backgroundMessage = 'Le téléversement a échoué. La session a peut-être expiré.'; }
     finally { this.backgroundUploading = false; input.value = ''; }
+  }
+
+  resetBackgroundSettings(): void {
+    const background = this.selectedRoom?.background;
+    if (!background) return;
+    Object.assign(background, DEFAULT_BACKGROUND_SETTINGS);
+    this.backgroundMessage = 'Paramètres de l’image remis par défaut. Enregistrez pour les appliquer.';
+    this.saveState = 'idle';
   }
 
   isEntitySelected(entityId: string): boolean {
@@ -257,6 +270,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     }
     this.draftRooms = this.draftRooms.filter((item) => item.id !== room.id);
     this.selectedRoomId = this.draftRooms[0]?.id ?? '';
+    if (this.draftDeviceDefaultRoomId === room.id) this.draftDeviceDefaultRoomId = this.draftRooms[0]?.id ?? '';
     this.saveState = 'idle';
   }
 
@@ -287,18 +301,19 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     this.draggedControlIndex = -1;
   }
 
-  updateRoomId(): void {
-    const room = this.selectedRoom;
-    if (room) {
-      room.id = this.slugify(room.name) || room.id;
-      this.selectedRoomId = room.id;
-    }
+  saveChanges(): void {
+    this.save.emit({ rooms: this.draftRooms.map((room) => ({ ...room })), floors: this.draftFloors.map((floor) => ({ ...floor })), settings: { ...this.draftSettings }, deviceDefaultFloorId: this.draftDeviceDefaultFloorId, deviceDefaultRoomId: this.draftDeviceDefaultRoomId });
+    this.saveState = 'saved';
+  }
+
+  onDefaultRoomChange(): void {
+    const room = this.draftRooms.find((candidate) => candidate.id === this.draftDeviceDefaultRoomId);
+    if (room) this.draftDeviceDefaultFloorId = room.floor;
     this.saveState = 'idle';
   }
 
-  saveChanges(): void {
-    this.save.emit({ rooms: this.draftRooms.map((room) => ({ ...room })), floors: this.draftFloors.map((floor) => ({ ...floor })), settings: { ...this.draftSettings }, deviceDefaultFloorId: this.draftDeviceDefaultFloorId });
-    this.saveState = 'saved';
+  floorLabel(floorId: string): string {
+    return this.draftFloors.find((floor) => floor.id === floorId)?.name || floorId;
   }
 
   addFloor(): void {

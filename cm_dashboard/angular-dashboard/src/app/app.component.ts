@@ -134,6 +134,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   selectedSecurityCamera = 0;
   doorbellOpen = false;
   deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
+  deviceDefaultRoomId = localStorage.getItem('ha-dashboard-default-room') || '';
+  readonly isIPadDevice = navigator.maxTouchPoints > 1 && /iPad|Macintosh/.test(navigator.userAgent);
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Main floor', icon: 'home' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
     return this.navItems.flatMap((nav) => {
@@ -147,16 +149,23 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   get activeBackgroundOverlay(): number {
     const overlay = this.roomBackgrounds.find((background) => background.roomValue === this.activeRoomValue)?.overlay ?? .26;
-    return this.useBrightTabletProfile ? overlay * .72 : overlay;
+    return this.useBrightTabletProfile ? overlay * .5 : overlay;
   }
 
   displayBackgroundBrightness(brightness: number): number {
-    return this.useBrightTabletProfile ? Math.min(1.25, brightness * 1.14) : brightness;
+    return this.useBrightTabletProfile ? Math.min(1.35, brightness * 1.32) : brightness;
+  }
+
+  displayBackgroundSaturation(saturation: number): number {
+    return this.useBrightTabletProfile ? Math.min(1.65, saturation * 1.18) : saturation;
+  }
+
+  displayBackgroundContrast(contrast: number): number {
+    return this.useBrightTabletProfile ? Math.min(1.55, contrast * 1.08) : contrast;
   }
 
   private get useBrightTabletProfile(): boolean {
-    const isIPad = navigator.maxTouchPoints > 1 && /iPad|Macintosh/.test(navigator.userAgent);
-    return this.dashboardSettings.tabletMode || isIPad;
+    return this.dashboardSettings.tabletMode || this.isIPadDevice;
   }
 
   get overviewActive(): boolean { return this.activeRoomValue === '__overview__'; }
@@ -384,14 +393,16 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   async saveAdminRooms(payload: AdminSavePayload): Promise<void> {
-    const { rooms, floors, settings, deviceDefaultFloorId } = payload;
+    const { rooms, floors, settings, deviceDefaultFloorId, deviceDefaultRoomId } = payload;
     this.adminRoomsOverride = rooms.map((room) => ({ ...room }));
     this.dashboardSettings = { ...settings };
     this.applyInterfaceSettings();
     if (!this.screensaverActive) this.resetInactivityTimer();
     this.dashboardFloors = floors.map((floor) => ({ ...floor }));
     this.deviceDefaultFloorId = deviceDefaultFloorId || floors[0]?.id || 'main';
+    this.deviceDefaultRoomId = rooms.some((room) => room.id === deviceDefaultRoomId) ? deviceDefaultRoomId : rooms[0]?.id || '';
     localStorage.setItem('ha-dashboard-default-floor', this.deviceDefaultFloorId);
+    localStorage.setItem('ha-dashboard-default-room', this.deviceDefaultRoomId);
     this.dashboardPresenceInitialized = false;
     if (!settings.screensaverEntityId) {
       this.dashboardPresenceActive = true;
@@ -431,11 +442,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       // Restart it so the configured inactivity delay is actually respected.
       if (!this.screensaverActive) this.resetInactivityTimer();
       this.dashboardFloors = home.floors;
+      const defaultRoom = home.rooms.find((room) => room.id === this.deviceDefaultRoomId)
+        ?? home.rooms.find((room) => room.floor === this.deviceDefaultFloorId)
+        ?? home.rooms[0];
+      this.deviceDefaultRoomId = defaultRoom?.id || '';
+      if (defaultRoom) this.deviceDefaultFloorId = defaultRoom.floor;
+      localStorage.setItem('ha-dashboard-default-room', this.deviceDefaultRoomId);
+      localStorage.setItem('ha-dashboard-default-floor', this.deviceDefaultFloorId);
       this.navItems = home.rooms.map((room, index) => ({
         label: room.name,
         value: room.id,
         floor: room.floor,
-        active: room.id === this.activeRoomValue || index === 0,
+        active: room.id === defaultRoom?.id,
         icon: room.icon,
         iconStyle: room.iconStyle,
         iconFilled: room.iconFilled,
@@ -444,6 +462,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         vacuum: room.vacuum,
         background: room.background
       }));
+      if (defaultRoom) this.setActiveRoom(defaultRoom.id, defaultRoom.name);
     } catch {
       // Keep the built-in configuration when the local server is unavailable.
     }
@@ -712,7 +731,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private showHomeOverview(): void {
-    const defaultRoom = this.navItems.find((item) => item.floor === this.deviceDefaultFloorId && item.value);
+    const defaultRoom = this.navItems.find((item) => item.value === this.deviceDefaultRoomId)
+      ?? this.navItems.find((item) => item.floor === this.deviceDefaultFloorId && item.value);
     this.lastRoomValue = defaultRoom?.value ?? (this.activeRoomValue === '__overview__' ? this.lastRoomValue : this.activeRoomValue);
     this.activeRoomValue = '__overview__';
     this.activeControls = [];
@@ -794,6 +814,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   private returnToDefaultRoom(): void {
     const defaultItem =
+      this.navItems.find((item) => item.value === this.deviceDefaultRoomId) ??
       this.navItems.find((item) => item.value === 'entree') ??
       this.navItems.find((item) => item.value === 'accueil') ??
       FALLBACK_NAV_ITEMS.find((item) => item.value === 'entree') ??

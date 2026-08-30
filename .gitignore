@@ -1,3 +1,4 @@
+.DS_Store
 cm_dashboard/data/cache/
 cm_dashboard/data/backups/
 cm_dashboard/data/secrets/
