@@ -15,6 +15,8 @@ const ENGLISH_PHRASES: Array<[string, string]> = [
   ['Réglages globaux appliqués à toutes les pièces.', 'Global settings applied to every room.'], ['Taille de l’interface', 'Interface size'], ['Intensité du verre', 'Glass intensity'],
   ['Réduire les animations', 'Reduce animations'], ['Transitions plus courtes et sans mouvement', 'Shorter transitions with less motion'], ['Format 24 heures', '24-hour format'],
   ['Mode tablette murale', 'Wall tablet mode'], ['Mode tablette', 'Tablet mode'], ['Interface tactile et curseur discret', 'Touch interface with a discreet cursor'], ['Veille après', 'Sleep after'],
+  ['Afficher en plein écran', 'Enter full screen'], ['Mode plein écran activé.', 'Full-screen mode enabled.'], ['L’application est déjà ouverte sans les barres du navigateur.', 'The app is already open without browser bars.'],
+  ['Sur iPad, ajoutez le dashboard à l’écran d’accueil pour qu’il s’ouvre toujours sans les barres de Safari.', 'On iPad, add the dashboard to the Home Screen so it always opens without Safari bars.'],
   ['Étage par défaut de cet écran', 'Default floor for this display'], ['Ce choix est conservé uniquement sur cette tablette.', 'This choice is stored only on this tablet.'],
   ['Pièce par défaut de cet écran', 'Default room for this display'], ['Cette pièce et son étage seront ouverts au prochain chargement. Ce choix est conservé uniquement sur cette tablette.', 'This room and its floor will open on the next load. This choice is stored only on this tablet.'],
   ['Maison et sécurité', 'Home and security'], ['Accès et ouvertures', 'Access and openings'], ['Serrures, portes, fenêtres et garage', 'Locks, doors, windows, and garage'],

@@ -86,8 +86,32 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   pairingCode = '';
   deviceMessage = '';
   devicesLoading = false;
+  fullscreenMessage = '';
 
   constructor(private readonly api: DashboardApiService) {}
+
+  async enterFullscreen(): Promise<void> {
+    this.fullscreenMessage = '';
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+    if (standalone) {
+      this.fullscreenMessage = 'L’application est déjà ouverte sans les barres du navigateur.';
+      return;
+    }
+
+    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+    const request = root.requestFullscreen?.bind(root) ?? root.webkitRequestFullscreen?.bind(root);
+    if (!request) {
+      this.fullscreenMessage = 'Safari ne permet pas le plein écran pour cette page. Utilisez Partager → Sur l’écran d’accueil.';
+      return;
+    }
+
+    try {
+      await request();
+      this.fullscreenMessage = 'Mode plein écran activé.';
+    } catch {
+      this.fullscreenMessage = 'Le plein écran a été refusé. Touchez de nouveau le bouton ou ajoutez l’app à l’écran d’accueil.';
+    }
+  }
 
   ngOnInit(): void {
     try { this.favoriteIcons = JSON.parse(localStorage.getItem('dashboard-favorite-icons') || '[]'); } catch {}
