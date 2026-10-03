@@ -22,7 +22,7 @@
     [defaultFloor]="deviceDefaultFloorId"
     [time]="now"
     [actionChip]="vacuumActionChip"
-    [securityAvailable]="dashboardSettings.security.enabled && visibleSecurityCameras.length > 0"
+    [securityAvailable]="dashboardSettings.security.enabled && (dashboardSettings.security.cameras.length > 0 || dashboardSettings.security.accessPoints.length > 0)"
     [securityActive]="securityCenterOpen"
     (clockLongPress)="onClockLongPress()"
     (itemClick)="onNavClick($event)"
@@ -40,10 +40,17 @@
 
   @if (screensaverActive) { <section class="screensaver-display"><div class="screensaver-time">{{ now }}</div><div class="screensaver-date">{{ currentDateLabel }}</div><div class="screensaver-weather"><span class="material-symbols-outlined">{{ weatherIcon }}</span>{{ weatherTemperature }} · {{ weatherLabel }}</div><div class="screensaver-wake">Touchez pour ouvrir la maison</div></section> }
 
+  @if (motionCameraPopup; as camera) {
+    <aside class="motion-camera-card" [class.on-screensaver]="screensaverActive" aria-live="polite" aria-label="Mouvement détecté">
+      <div class="motion-camera-visual"><img [src]="motionCameraSnapshotUrl(camera.entityId)" [alt]="camera.name"><span class="motion-camera-live"><i></i>Mouvement détecté</span><button type="button" (click)="closeMotionCameraPopup()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="motion-camera-copy"><span class="material-symbols-outlined">motion_sensor_active</span><div><small>{{ camera.zone === 'entrance' ? 'Entrée' : camera.zone === 'interior' ? 'Intérieur' : 'Extérieur' }}</small><strong>{{ camera.name }}</strong></div><button type="button" (click)="openMotionCameraInSecurityCenter()">Voir en direct<span class="material-symbols-outlined">arrow_forward</span></button></div>
+    </aside>
+  }
+
   <div class="toast-stack">@for (toast of homeToasts; track toast.id) { <article class="home-toast"><span class="material-symbols-outlined">{{ toast.icon }}</span><div><strong>{{ toast.title }}</strong><small>{{ toast.detail }}</small></div></article> }</div>
 
   @if (currentRoomClimate) {
-    <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible">
+    <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible" [class.is-under-sheet]="isVacuumSheetVisible || !!controlDetail">
       <button type="button" class="hero-climate" [class.is-concealed]="isClimatePopoutVisible" (click)="toggleClimatePopout()">
         <div class="hero-climate-main">
           <span class="material-symbols-outlined hero-climate-icon">device_thermostat</span>
@@ -104,14 +111,14 @@
     </div>
   }
 
-  @if (securityCenterOpen) {
-    <button type="button" class="security-backdrop" (click)="closeSecurityCenter()" aria-label="Fermer le centre de sécurité"></button>
-    <section class="security-center" aria-label="Centre de sécurité">
-      <header><div><small>Résidence</small><h2>Centre de sécurité</h2></div><button type="button" (click)="closeSecurityCenter()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></header>
-      <nav class="security-filters"><button type="button" [class.active]="securityZone === 'all'" (click)="setSecurityZone('all')">Toutes</button><button type="button" [class.active]="securityZone === 'entrance'" (click)="setSecurityZone('entrance')">Entrées</button><button type="button" [class.active]="securityZone === 'exterior'" (click)="setSecurityZone('exterior')">Extérieur</button><button type="button" [class.active]="securityZone === 'interior'" (click)="setSecurityZone('interior')">Intérieur</button></nav>
-      @if (activeSecurityCamera; as camera) { <div class="security-primary"><img [src]="cameraSnapshotUrl(camera.entityId)" [alt]="camera.name"><div><span class="live-dot"></span><strong>{{ camera.name }}</strong><small>{{ camera.zone === 'entrance' ? 'Entrée' : camera.zone === 'interior' ? 'Intérieur' : 'Extérieur' }}</small></div></div> } @else { <div class="security-empty"><span class="material-symbols-outlined">videocam_off</span>Aucune caméra dans cette zone</div> }
-      <div class="security-thumbnails">@for (camera of visibleSecurityCameras; track camera.entityId; let index = $index) { <button type="button" [class.active]="selectedSecurityCamera === index" (click)="selectedSecurityCamera = index"><img [src]="cameraSnapshotUrl(camera.entityId)" alt=""><span>{{ camera.name }}</span></button> }</div>
-      <footer><span><i></i>{{ hassConnected ? 'Système opérationnel' : 'Connexion interrompue' }}</span><small>{{ visibleSecurityCameras.length }} caméra{{ visibleSecurityCameras.length > 1 ? 's' : '' }}</small></footer>
+  @if (securityCenterOpen || securityCenterClosing) {
+    <button type="button" class="security-backdrop" [class.is-closing]="securityCenterClosing" (click)="closeSecurityCenter()" aria-label="Fermer le centre de sécurité"></button>
+    <section class="security-center security-command" [class.is-closing]="securityCenterClosing" aria-label="Centre de sécurité">
+      <aside class="security-sidebar"><div class="security-brand"><span class="material-symbols-outlined">shield</span><div><small>{{ dashboardSettings.homeName }}</small><strong>Sécurité</strong></div></div><div class="security-overall" [class.warning]="!securityIsClear"><span class="material-symbols-outlined">{{ securityIsClear ? 'verified_user' : 'shield_lock' }}</span><div><strong>{{ securityIsClear ? 'Propriété sécurisée' : 'Attention requise' }}</strong><small>{{ securityOpenCount }} ouverture · {{ securityUnlockedCount }} déverrouillée</small></div></div><nav class="security-zone-nav"><button type="button" [class.active]="securityZone === 'all'" (click)="setSecurityZone('all')"><span class="material-symbols-outlined">select_all</span>Toute la propriété</button><button type="button" [class.active]="securityZone === 'entrance'" (click)="setSecurityZone('entrance')"><span class="material-symbols-outlined">door_front</span>Entrées</button><button type="button" [class.active]="securityZone === 'exterior'" (click)="setSecurityZone('exterior')"><span class="material-symbols-outlined">yard</span>Extérieur</button><button type="button" [class.active]="securityZone === 'interior'" (click)="setSecurityZone('interior')"><span class="material-symbols-outlined">home</span>Intérieur</button></nav><footer><i [class.offline]="!hassConnected"></i><span>{{ hassConnected ? 'Système opérationnel' : 'Connexion interrompue' }}</span></footer></aside>
+      <main class="security-workspace"><header><div><small>Centre de commande</small><h2>{{ securityZone === 'all' ? 'Vue d’ensemble' : securityZone === 'entrance' ? 'Entrées' : securityZone === 'interior' ? 'Intérieur' : 'Extérieur' }}</h2></div><div class="security-header-metrics"><span><b>{{ visibleSecurityCameras.length }}</b> caméras</span><span><b>{{ visibleSecurityAccessPoints.length }}</b> accès</span></div><button type="button" (click)="closeSecurityCenter()" aria-label="Fermer"><span class="material-symbols-outlined">close</span></button></header>
+        <section class="security-camera-layout">@if (activeSecurityCamera; as camera) { <div class="security-primary"><img [src]="cameraSnapshotUrl(camera.entityId)" [alt]="camera.name"><div><span class="live-dot"></span><strong>{{ camera.name }}</strong><small>{{ camera.zone === 'entrance' ? 'Entrée' : camera.zone === 'interior' ? 'Intérieur' : 'Extérieur' }}</small></div></div> } @else { <div class="security-empty"><span class="material-symbols-outlined">videocam_off</span>Aucune caméra dans cette zone</div> }<div class="security-thumbnails">@for (camera of visibleSecurityCameras; track camera.entityId; let index = $index) { <button type="button" [class.active]="selectedSecurityCamera === index" (click)="selectedSecurityCamera = index"><img [src]="cameraSnapshotUrl(camera.entityId)" alt=""><span>{{ camera.name }}</span></button> }</div></section>
+        <section class="security-access-section"><div class="security-section-heading"><div><small>Périmètre</small><h3>Portes et accès</h3></div><span>{{ visibleSecurityAccessPoints.length }}</span></div><div class="security-access-grid">@for (point of visibleSecurityAccessPoints; track point.name) { <article [class.warning]="securityAccessOpen(point) || !securityAccessLocked(point)"><span class="material-symbols-outlined">{{ securityAccessOpen(point) ? 'door_open' : securityAccessLocked(point) ? 'lock' : 'lock_open' }}</span><div><strong>{{ point.name }}</strong><small>{{ securityAccessStatus(point) }}</small></div>@if (point.lockEntityId) { <button type="button" (click)="toggleSecurityAccess(point)"><span class="material-symbols-outlined">{{ securityAccessLocked(point) ? 'lock_open' : 'lock' }}</span>{{ securityAccessLocked(point) ? 'Déverrouiller' : 'Verrouiller' }}</button> }</article> } @empty { <div class="security-access-empty">Aucun accès configuré pour cette zone.</div> }</div></section>
+      </main>
     </section>
   }
 

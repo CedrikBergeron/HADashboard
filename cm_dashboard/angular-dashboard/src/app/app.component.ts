@@ -8,7 +8,7 @@ import {
 } from './components/bottom-control-bar/bottom-control-bar.component';
 import { NavItem } from './models/NavItem';
 import { AdminEntityOption, AdminPanelComponent, AdminRoom, AdminSavePayload } from './components/admin-panel/admin-panel.component';
-import { DashboardApiService, DashboardFloor, DashboardSettings, SecurityCamera } from './service/dashboard-api.service';
+import { DashboardApiService, DashboardFloor, DashboardSettings, SecurityAccessPoint, SecurityCamera } from './service/dashboard-api.service';
 import {
   HassAreaRegistryEntry,
   HassDeviceRegistryEntry,
@@ -73,6 +73,9 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private notificationsInitialized = false;
   private previousDoorbellMarker = '';
   private doorbellTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private motionPopupTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private securityCenterCloseTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly previousCameraMotionStates: Record<string, { active: boolean; marker: string }> = {};
   private previousImportantStates: Record<string, string> = {};
   private climateDialPointerId: number | null = null;
   private climateCommitTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -128,11 +131,14 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   activationBusy = false;
   hassSetupRequired = false;
   hassNoticeDismissed = false;
-  dashboardSettings: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+  dashboardSettings: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], accessPoints: [], motionPopupsEnabled: true, motionPopupDurationSeconds: 15, doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
   securityCenterOpen = false;
+  securityCenterClosing = false;
   securityZone: 'all' | SecurityCamera['zone'] = 'all';
   selectedSecurityCamera = 0;
   doorbellOpen = false;
+  motionCameraPopup: SecurityCamera | null = null;
+  motionCameraSnapshotNonce = 0;
   deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
   deviceDefaultRoomId = localStorage.getItem('ha-dashboard-default-room') || '';
   readonly isIPadDevice = navigator.maxTouchPoints > 1 && /iPad|Macintosh/.test(navigator.userAgent);
@@ -198,11 +204,23 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
   get visibleSecurityCameras(): SecurityCamera[] { const cameras = this.dashboardSettings.security.cameras.filter((camera) => camera.entityId); return this.securityZone === 'all' ? cameras : cameras.filter((camera) => camera.zone === this.securityZone); }
   get activeSecurityCamera(): SecurityCamera | undefined { return this.visibleSecurityCameras[Math.min(this.selectedSecurityCamera, Math.max(0, this.visibleSecurityCameras.length - 1))]; }
+  get visibleSecurityAccessPoints(): SecurityAccessPoint[] { const points = this.dashboardSettings.security.accessPoints || []; return this.securityZone === 'all' ? points : points.filter((point) => point.zone === this.securityZone); }
+  get securityUnlockedCount(): number { return (this.dashboardSettings.security.accessPoints || []).filter((point) => ['unlocked','unlocking','open'].includes(this.latestEntities[point.lockEntityId]?.state || '')).length; }
+  get securityOpenCount(): number { return (this.dashboardSettings.security.accessPoints || []).filter((point) => ['on','open','detected'].includes(this.latestEntities[point.contactEntityId]?.state || '')).length; }
+  get securityIsClear(): boolean { return this.securityUnlockedCount === 0 && this.securityOpenCount === 0; }
+  securityAccessLocked(point: SecurityAccessPoint): boolean { return ['locked','locking'].includes(this.latestEntities[point.lockEntityId]?.state || ''); }
+  securityAccessOpen(point: SecurityAccessPoint): boolean { return ['on','open','detected'].includes(this.latestEntities[point.contactEntityId]?.state || ''); }
+  securityAccessStatus(point: SecurityAccessPoint): string { if (this.securityAccessOpen(point)) return 'Ouvert'; if (!point.lockEntityId) return point.contactEntityId ? 'Fermé' : 'État non configuré'; return this.securityAccessLocked(point) ? 'Verrouillé' : 'Déverrouillé'; }
+  async toggleSecurityAccess(point: SecurityAccessPoint): Promise<void> { if (!point.lockEntityId) return; const locked = this.securityAccessLocked(point); if (locked && !window.confirm(`Déverrouiller « ${point.name} »?`)) return; try { await this.hass.callService('lock', locked ? 'unlock' : 'lock', point.lockEntityId); } catch { this.showActionToast(point.name, 'La commande de serrure a échoué', 'error'); } }
   cameraSnapshotUrl(entityId: string): string { return this.dashboardApi.cameraSnapshotUrl(entityId); }
+  motionCameraSnapshotUrl(entityId: string): string { return `${this.cameraSnapshotUrl(entityId)}?motion=${this.motionCameraSnapshotNonce}`; }
   entityLabelForDashboard(entityId: string): string { return String(this.latestEntities[entityId]?.attributes?.['friendly_name'] || 'Entrée principale'); }
   setSecurityZone(zone: typeof this.securityZone): void { this.securityZone = zone; this.selectedSecurityCamera = 0; }
-  toggleSecurityCenter(): void { this.securityCenterOpen = !this.securityCenterOpen; if (this.securityCenterOpen) { this.closeClimatePopout(); this.closeVacuumSheet(); } }
-  closeSecurityCenter(): void { this.securityCenterOpen = false; }
+  toggleSecurityCenter(): void { if (this.securityCenterOpen || this.securityCenterClosing) this.closeSecurityCenter(); else this.openSecurityCenter(); }
+  openSecurityCenter(): void { if (this.securityCenterCloseTimeoutId) clearTimeout(this.securityCenterCloseTimeoutId); this.securityCenterClosing = false; this.securityCenterOpen = true; this.closeClimatePopout(); this.closeVacuumSheet(); }
+  closeSecurityCenter(): void { if (!this.securityCenterOpen && !this.securityCenterClosing) return; if (this.securityCenterCloseTimeoutId) clearTimeout(this.securityCenterCloseTimeoutId); this.securityCenterOpen = false; this.securityCenterClosing = true; this.securityCenterCloseTimeoutId = setTimeout(() => { this.securityCenterClosing = false; this.securityCenterCloseTimeoutId = null; }, 280); }
+  closeMotionCameraPopup(): void { this.motionCameraPopup = null; if (this.motionPopupTimeoutId) clearTimeout(this.motionPopupTimeoutId); this.motionPopupTimeoutId = null; }
+  openMotionCameraInSecurityCenter(): void { const camera = this.motionCameraPopup; if (!camera) return; this.closeMotionCameraPopup(); this.securityZone = camera.zone; const cameras = this.visibleSecurityCameras; this.selectedSecurityCamera = Math.max(0, cameras.findIndex((item) => item.entityId === camera.entityId)); this.openSecurityCenter(); }
   closeDoorbell(): void { this.doorbellOpen = false; if (this.doorbellTimeoutId) clearTimeout(this.doorbellTimeoutId); this.doorbellTimeoutId = null; }
   async unlockDoorFromDoorbell(): Promise<void> { const id = this.dashboardSettings.security.doorLockEntityId; if (!id || !window.confirm('Déverrouiller la porte?')) return; try { await this.hass.callService('lock','unlock',id); this.closeDoorbell(); } catch { this.showActionToast('Porte','Le déverrouillage a échoué','error'); } }
   async turnOnEntryLight(): Promise<void> { const id = this.dashboardSettings.security.entryLightEntityId; if (!id) return; try { await this.hass.callService(id.split('.')[0],'turn_on',id); } catch { this.showActionToast('Éclairage','La commande a échoué','error'); } }
@@ -272,6 +290,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.adminSessionTimeoutId) clearTimeout(this.adminSessionTimeoutId);
     if (this.doorbellTimeoutId) clearTimeout(this.doorbellTimeoutId);
+    if (this.motionPopupTimeoutId) clearTimeout(this.motionPopupTimeoutId);
+    if (this.securityCenterCloseTimeoutId) clearTimeout(this.securityCenterCloseTimeoutId);
     if (this.clockIntervalId) {
       clearInterval(this.clockIntervalId);
       this.clockIntervalId = null;
@@ -1611,6 +1631,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private updateHomeNotifications(entities: Record<string, HassEntityState>): void {
+    this.updateCameraMotionPopups(entities);
     const preferences = this.dashboardSettings.notifications;
     const doorbellId = this.dashboardSettings.security.enabled ? this.dashboardSettings.security.doorbellEntityId : '';
     const doorbell = doorbellId ? entities[doorbellId] : undefined;
@@ -1653,6 +1674,28 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         const safetyAlert = ['smoke','carbon_monoxide','gas','moisture','safety'].includes(String(entity.attributes['device_class'] || ''));
         setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), (safetyAlert ? 12 : preferences.durationSeconds) * 1000);
       }
+    }
+  }
+
+  private updateCameraMotionPopups(entities: Record<string, HassEntityState>): void {
+    const security = this.dashboardSettings.security;
+    if (!security.enabled || !security.motionPopupsEnabled) return;
+    for (const camera of security.cameras) {
+      if (!camera.entityId || !camera.motionEntityId || camera.motionPopupEnabled === false) continue;
+      const motion = entities[camera.motionEntityId];
+      if (!motion) continue;
+      const marker = `${motion.state}:${motion.last_updated || motion.last_changed || ''}`;
+      const isEvent = motion.entity_id.startsWith('event.');
+      const active = isEvent
+        ? !['unknown','unavailable'].includes(motion.state)
+        : ['on','detected','motion','active','occupied','true'].includes(String(motion.state).toLowerCase());
+      const previous = this.previousCameraMotionStates[camera.motionEntityId];
+      this.previousCameraMotionStates[camera.motionEntityId] = { active, marker };
+      if (!previous || previous.marker === marker || !active || (!isEvent && previous.active)) continue;
+      this.motionCameraPopup = camera;
+      this.motionCameraSnapshotNonce = Date.now();
+      if (this.motionPopupTimeoutId) clearTimeout(this.motionPopupTimeoutId);
+      this.motionPopupTimeoutId = setTimeout(() => this.closeMotionCameraPopup(), Math.max(5, security.motionPopupDurationSeconds || 15) * 1000);
     }
   }
 

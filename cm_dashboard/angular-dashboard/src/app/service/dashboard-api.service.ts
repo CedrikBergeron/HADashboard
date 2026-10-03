@@ -5,8 +5,9 @@ import type { AdminRoom } from '../components/admin-panel/admin-panel.component'
 
 type StoredRoom = { id: string; name: string; floor: string; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
 export type NotificationPreferences = { security: boolean; safety: boolean; criticalDevices: boolean; system: boolean; durationSeconds: number };
-export type SecurityCamera = { entityId: string; name: string; zone: 'exterior' | 'entrance' | 'interior' };
-export type SecurityPreferences = { enabled: boolean; cameras: SecurityCamera[]; doorbellEntityId: string; doorbellCameraEntityId: string; doorLockEntityId: string; entryLightEntityId: string; doorbellDurationSeconds: number };
+export type SecurityCamera = { entityId: string; name: string; zone: 'exterior' | 'entrance' | 'interior'; motionEntityId: string; motionPopupEnabled: boolean };
+export type SecurityAccessPoint = { name: string; zone: 'exterior' | 'entrance' | 'interior'; lockEntityId: string; contactEntityId: string };
+export type SecurityPreferences = { enabled: boolean; cameras: SecurityCamera[]; accessPoints: SecurityAccessPoint[]; motionPopupsEnabled: boolean; motionPopupDurationSeconds: number; doorbellEntityId: string; doorbellCameraEntityId: string; doorLockEntityId: string; entryLightEntityId: string; doorbellDurationSeconds: number };
 export type DashboardSettings = { language?: string; homeName: string; screensaverEntityId: string; screensaverActiveState: string; fontScale: number; glassOpacity: number; reducedMotion: boolean; clock24h: boolean; tabletMode: boolean; inactivityMinutes: number; notifications: NotificationPreferences; security: SecurityPreferences };
 export type DashboardFloor = { id: string; name: string; icon: string };
 export type SystemHealth = { status: string; uptime: number; node: string; homeReadable: boolean; sessions: number; now: string };
@@ -83,7 +84,10 @@ export class DashboardApiService {
         },
         security: {
           enabled: home.settings?.security?.enabled === true,
-          cameras: Array.isArray(home.settings?.security?.cameras) ? home.settings!.security!.cameras.map((camera) => ({ entityId: String(camera.entityId || ''), name: String(camera.name || 'Caméra'), zone: ['entrance','interior'].includes(camera.zone) ? camera.zone : 'exterior' })) : [],
+          cameras: Array.isArray(home.settings?.security?.cameras) ? home.settings!.security!.cameras.map((camera) => ({ entityId: String(camera.entityId || ''), name: String(camera.name || 'Caméra'), zone: ['entrance','interior'].includes(camera.zone) ? camera.zone : 'exterior', motionEntityId: String(camera.motionEntityId || ''), motionPopupEnabled: camera.motionPopupEnabled !== false })) : [],
+          accessPoints: Array.isArray(home.settings?.security?.accessPoints) ? home.settings!.security!.accessPoints.map((point) => ({ name: String(point.name || 'Accès'), zone: ['exterior','interior'].includes(point.zone) ? point.zone : 'entrance', lockEntityId: String(point.lockEntityId || ''), contactEntityId: String(point.contactEntityId || '') })) : [],
+          motionPopupsEnabled: home.settings?.security?.motionPopupsEnabled !== false,
+          motionPopupDurationSeconds: Number(home.settings?.security?.motionPopupDurationSeconds ?? 15),
           doorbellEntityId: String(home.settings?.security?.doorbellEntityId || ''),
           doorbellCameraEntityId: String(home.settings?.security?.doorbellCameraEntityId || ''),
           doorLockEntityId: String(home.settings?.security?.doorLockEntityId || ''),

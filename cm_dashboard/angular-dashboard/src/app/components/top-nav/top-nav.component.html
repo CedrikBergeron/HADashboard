@@ -21,9 +21,6 @@
     </div>
 
     <div class="action-cluster">
-      @if (securityAvailable) {
-        <button type="button" class="security-chip" [class.active]="securityActive" (click)="securityClick.emit()" aria-label="Ouvrir le centre de sécurité"><span class="material-symbols-outlined">shield</span></button>
-      }
       <span class="action-chip-slot" [class.is-empty]="!actionChip">
         @if (actionChip) {
           <button
@@ -46,6 +43,9 @@
           </button>
         }
       </span>
+      @if (securityAvailable) {
+        <button type="button" class="security-chip" [class.active]="securityActive" (click)="securityClick.emit()" aria-label="Ouvrir le centre de sécurité"><span class="material-symbols-outlined">shield</span></button>
+      }
         <button type="button" class="floor-badge" [disabled]="floorChangePending" [attr.aria-busy]="floorChangePending" (click)="toggleFloor()" aria-label="Changer d'étage">
           <span class="material-symbols-outlined floor-badge-icon">stairs_2</span>
           <span class="floor-badge-label" [class.floor-transition-a]="floorAnimationAlternate" [class.floor-transition-b]="!floorAnimationAlternate">{{ currentFloorLabel }}</span>

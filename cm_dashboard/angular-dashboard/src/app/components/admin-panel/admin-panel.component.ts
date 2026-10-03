@@ -23,7 +23,7 @@ export interface AdminRoomBackground { url: string; positionX: number; positionY
 export interface AdminEntityOption { entityId: string; name: string; state: string; }
 type TechnicalHealthGroup = { id: string; label: string; icon: string; total: number; healthy: number; issues: AdminEntityOption[]; detail: string };
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; deviceDefaultRoomId: string; }
-const DEFAULT_SETTINGS: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
+const DEFAULT_SETTINGS: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], accessPoints: [], motionPopupsEnabled: true, motionPopupDurationSeconds: 15, doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
 const DEFAULT_BACKGROUND_SETTINGS = { positionX: 50, positionY: 50, brightness: .72, saturation: .9, contrast: 1.02, overlay: .26 };
 
 @Component({
@@ -64,7 +64,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   pinSaving = false;
   entityPickerOpen = false;
   entityQuery = '';
-  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' | 'securityCamera' | 'doorbell' | 'doorbellCamera' | 'doorLock' | 'entryLight' = 'presence';
+  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' | 'securityCamera' | 'cameraMotion' | 'accessLock' | 'accessContact' | 'doorbell' | 'doorbellCamera' | 'doorLock' | 'entryLight' = 'presence';
   entityPickerControlIndex = -1;
   iconPickerControlIndex = -1;
   backgroundUploading = false;
@@ -159,7 +159,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
       if (!this.draftRooms.some((room) => room.id === this.draftDeviceDefaultRoomId)) this.draftDeviceDefaultRoomId = this.draftRooms[0]?.id ?? '';
       this.draftInitialized = true;
     }
-    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications }, security: { ...DEFAULT_SETTINGS.security, ...this.settings.security, cameras: (this.settings.security?.cameras || []).map((camera) => ({ ...camera })) } };
+    if (changes['settings'] && changes['settings'].firstChange) this.draftSettings = { ...this.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications }, security: { ...DEFAULT_SETTINGS.security, ...this.settings.security, cameras: (this.settings.security?.cameras || []).map((camera) => ({ ...camera })), accessPoints: (this.settings.security?.accessPoints || []).map((point) => ({ ...point })) } };
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
     if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
     if (changes['deviceDefaultRoomId'] && changes['deviceDefaultRoomId'].firstChange) this.draftDeviceDefaultRoomId = this.deviceDefaultRoomId || this.draftRooms[0]?.id || '';
@@ -199,7 +199,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   get visibleEntities(): AdminEntityOption[] {
     const query = this.normalizeSearch(this.entityQuery);
     const domain = (id: string) => id.split('.')[0];
-    const allowed = ['securityCamera','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'doorLock' ? ['lock'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
+    const allowed = ['securityCamera','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : ['doorLock','accessLock'].includes(this.entityPickerMode) ? ['lock'] : this.entityPickerMode === 'accessContact' ? ['binary_sensor'] : this.entityPickerMode === 'cameraMotion' ? ['binary_sensor','event','sensor'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
     const scoped = allowed ? this.entities.filter((entity) => allowed.includes(domain(entity.entityId))) : this.entities;
     if (!query) return scoped.slice(0, 250);
     return scoped.filter((entity) => this.normalizeSearch(`${entity.name} ${entity.entityId} ${entity.state}`).includes(query)).slice(0, 250);
@@ -265,6 +265,9 @@ export class AdminPanelComponent implements OnChanges, OnInit {
 
   isEntitySelected(entityId: string): boolean {
     if (this.entityPickerMode === 'securityCamera') return this.draftSettings.security.cameras[this.entityPickerControlIndex]?.entityId === entityId;
+    if (this.entityPickerMode === 'cameraMotion') return this.draftSettings.security.cameras[this.entityPickerControlIndex]?.motionEntityId === entityId;
+    if (this.entityPickerMode === 'accessLock') return this.draftSettings.security.accessPoints[this.entityPickerControlIndex]?.lockEntityId === entityId;
+    if (this.entityPickerMode === 'accessContact') return this.draftSettings.security.accessPoints[this.entityPickerControlIndex]?.contactEntityId === entityId;
     if (this.entityPickerMode === 'doorbell') return this.draftSettings.security.doorbellEntityId === entityId;
     if (this.entityPickerMode === 'doorbellCamera') return this.draftSettings.security.doorbellCameraEntityId === entityId;
     if (this.entityPickerMode === 'doorLock') return this.draftSettings.security.doorLockEntityId === entityId;
@@ -434,6 +437,9 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   selectPresenceEntity(entityId: string): void {
     const room = this.selectedRoom;
     if (this.entityPickerMode === 'securityCamera' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].entityId = entityId;
+    else if (this.entityPickerMode === 'cameraMotion' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].motionEntityId = entityId;
+    else if (this.entityPickerMode === 'accessLock' && this.draftSettings.security.accessPoints[this.entityPickerControlIndex]) this.draftSettings.security.accessPoints[this.entityPickerControlIndex].lockEntityId = entityId;
+    else if (this.entityPickerMode === 'accessContact' && this.draftSettings.security.accessPoints[this.entityPickerControlIndex]) this.draftSettings.security.accessPoints[this.entityPickerControlIndex].contactEntityId = entityId;
     else if (this.entityPickerMode === 'doorbell') this.draftSettings.security.doorbellEntityId = entityId;
     else if (this.entityPickerMode === 'doorbellCamera') this.draftSettings.security.doorbellCameraEntityId = entityId;
     else if (this.entityPickerMode === 'doorLock') this.draftSettings.security.doorLockEntityId = entityId;
@@ -459,8 +465,10 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     void this.openIconPicker();
   }
 
-  addSecurityCamera(): void { this.draftSettings.security.cameras.push({ entityId: '', name: `Caméra ${this.draftSettings.security.cameras.length + 1}`, zone: 'exterior' }); this.saveState = 'idle'; }
+  addSecurityCamera(): void { this.draftSettings.security.cameras.push({ entityId: '', name: `Caméra ${this.draftSettings.security.cameras.length + 1}`, zone: 'exterior', motionEntityId: '', motionPopupEnabled: true }); this.saveState = 'idle'; }
   removeSecurityCamera(index: number): void { this.draftSettings.security.cameras.splice(index, 1); this.saveState = 'idle'; }
+  addSecurityAccessPoint(): void { this.draftSettings.security.accessPoints.push({ name: `Accès ${this.draftSettings.security.accessPoints.length + 1}`, zone: 'entrance', lockEntityId: '', contactEntityId: '' }); this.saveState = 'idle'; }
+  removeSecurityAccessPoint(index: number): void { this.draftSettings.security.accessPoints.splice(index, 1); this.saveState = 'idle'; }
 
   addControl(): void {
     const room = this.selectedRoom;
