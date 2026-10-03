@@ -3,6 +3,7 @@
   [class.reduced-motion]="dashboardSettings.reducedMotion"
   [class.tablet-mode]="dashboardSettings.tabletMode"
   [class.ipad-device]="isIPadDevice"
+  [class.is-native-fullscreen]="fullscreenActive"
   [style.--glass-opacity]="dashboardSettings.glassOpacity"
   [class.is-screensaver]="screensaverActive"
   (pointerdown)="onUserGesture()">

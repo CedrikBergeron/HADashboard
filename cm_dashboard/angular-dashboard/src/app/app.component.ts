@@ -125,6 +125,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   adminPinValue = '';
   adminPinError = '';
   adminUnlocking = false;
+  fullscreenActive = false;
   adminSaveError = '';
   deviceAuthorized: boolean | null = null;
   activationCode = '';
@@ -387,6 +388,13 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     } catch {
       this.fullscreenAttempted = false;
     }
+  }
+
+  @HostListener('document:fullscreenchange')
+  @HostListener('document:webkitfullscreenchange')
+  onFullscreenChange(): void {
+    const fullscreenDocument = document as Document & { webkitFullscreenElement?: Element | null };
+    this.fullscreenActive = Boolean(document.fullscreenElement || fullscreenDocument.webkitFullscreenElement);
   }
 
   onAdminPinInput(event: Event): void {
@@ -1745,7 +1753,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
 
   private showToast(item: HomeToast, durationMs: number): void {
     this.homeToasts = [...this.homeToasts.slice(-2), item];
-    const fadeDurationMs = 360;
+    const fadeDurationMs = 520;
     setTimeout(() => {
       this.homeToasts = this.homeToasts.map((toast) => toast.id === item.id ? { ...toast, leaving: true } : toast);
       setTimeout(() => this.homeToasts = this.homeToasts.filter((toast) => toast.id !== item.id), fadeDurationMs);
