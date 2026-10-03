@@ -4,7 +4,8 @@
   [class.tablet-mode]="dashboardSettings.tabletMode"
   [class.ipad-device]="isIPadDevice"
   [style.--glass-opacity]="dashboardSettings.glassOpacity"
-  [class.is-screensaver]="screensaverActive">
+  [class.is-screensaver]="screensaverActive"
+  (pointerdown)="onUserGesture()">
   @for (background of roomBackgrounds; track background.roomValue) {
     <img
       class="bg-image"
@@ -47,7 +48,7 @@
     </aside>
   }
 
-  <div class="toast-stack">@for (toast of homeToasts; track toast.id) { <article class="home-toast"><span class="material-symbols-outlined">{{ toast.icon }}</span><div><strong>{{ toast.title }}</strong><small>{{ toast.detail }}</small></div></article> }</div>
+  <div class="toast-stack">@for (toast of homeToasts; track toast.id) { <article class="home-toast" [class.is-leaving]="toast.leaving"><span class="material-symbols-outlined">{{ toast.icon }}</span><div><strong>{{ toast.title }}</strong><small>{{ toast.detail }}</small></div></article> }</div>
 
   @if (currentRoomClimate) {
     <div class="hero-climate-wrap" [class.is-hidden]="!controlsVisible" [class.is-under-sheet]="isVacuumSheetVisible || !!controlDetail">
@@ -155,13 +156,13 @@
 
   @if (adminUnlockOpen) {
     <div class="admin-unlock-backdrop" (click)="closeAdmin()">
-      <form class="admin-unlock" (click)="$event.stopPropagation()" (submit)="$event.preventDefault(); unlockAdmin()">
+      <form class="admin-unlock" (click)="$event.stopPropagation()" (submit)="$event.preventDefault()" novalidate>
         <div class="admin-unlock-icon"><span class="material-symbols-outlined">lock</span></div>
         <h2>Accès administrateur</h2>
         <p>Entrez votre NIP pour continuer.</p>
-        <input type="password" inputmode="numeric" maxlength="8" [value]="adminPinValue" (input)="onAdminPinInput($event)" autofocus aria-label="NIP administrateur">
+        <input type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="8" [value]="adminPinValue" (input)="onAdminPinInput($event)" (keydown.enter)="unlockAdmin()" autofocus aria-label="NIP administrateur">
         @if (adminPinError) { <span class="admin-pin-error">{{ adminPinError }}</span> }
-        <div class="admin-unlock-actions"><button type="button" (click)="closeAdmin()">Annuler</button><button type="submit">Déverrouiller</button></div>
+        <div class="admin-unlock-actions"><button type="button" (click)="closeAdmin()">Annuler</button><button type="button" [disabled]="adminUnlocking" (click)="unlockAdmin()">{{ adminUnlocking ? 'Vérification…' : 'Déverrouiller' }}</button></div>
       </form>
     </div>
   }

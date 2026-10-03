@@ -48,7 +48,7 @@ type RoomClimateControl = {
 };
 
 type HomeAttentionItem = { icon: string; label: string; detail: string; tone: 'normal' | 'warning' | 'danger' };
-type HomeToast = { id: number; icon: string; title: string; detail: string };
+type HomeToast = { id: number; icon: string; title: string; detail: string; leaving?: boolean };
 
 const FALLBACK_NAV_ITEMS: NavItem[] = [{ label: 'Room', value: 'room', floor: 'main', active: true, icon: 'meeting_room' }];
 const DEFAULT_ROOM_VALUE = 'room';
@@ -94,6 +94,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private readonly climateDialCenterX = 120;
   private readonly climateDialCenterY = 110;
   private readonly climateDialRadius = 86;
+  private fullscreenAttempted = false;
 
   now = '19:58';
 
@@ -123,6 +124,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   adminPanelOpen = false;
   adminPinValue = '';
   adminPinError = '';
+  adminUnlocking = false;
   adminSaveError = '';
   deviceAuthorized: boolean | null = null;
   activationCode = '';
@@ -364,12 +366,41 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.adminPinError = '';
   }
 
+  /**
+   * iPadOS only grants the Fullscreen API from a trusted touch/click.  Keeping
+   * this at the page level means the first normal touch can enter immersive
+   * mode, rather than asking the user to find a setting in administration.
+   */
+  onUserGesture(): void {
+    if ((!this.dashboardSettings.tabletMode && !this.isIPadDevice) || this.fullscreenAttempted || document.fullscreenElement) return;
+    const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+    if (window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone) return;
+
+    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+    const request = root.requestFullscreen?.bind(root) ?? root.webkitRequestFullscreen?.bind(root);
+    if (!request) return;
+
+    this.fullscreenAttempted = true;
+    try {
+      const result = request();
+      if (result && typeof result.catch === 'function') result.catch(() => { this.fullscreenAttempted = false; });
+    } catch {
+      this.fullscreenAttempted = false;
+    }
+  }
+
   onAdminPinInput(event: Event): void {
     this.adminPinValue = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8);
     this.adminPinError = '';
   }
 
   async unlockAdmin(): Promise<void> {
+    if (this.adminUnlocking) return;
+    if (!/^\d{4,8}$/.test(this.adminPinValue)) {
+      this.adminPinError = 'Entrez un NIP de 4 à 8 chiffres.';
+      return;
+    }
+    this.adminUnlocking = true;
     try {
       await this.dashboardApi.unlock(this.adminPinValue);
       this.adminUnlockOpen = false;
@@ -377,6 +408,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.refreshAdminSession();
     } catch (error: any) {
       this.adminPinError = error?.error?.error || (error?.status === 0 ? 'Serveur indisponible' : 'Impossible de vérifier le NIP');
+    } finally {
+      this.adminUnlocking = false;
     }
   }
 
@@ -384,6 +417,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.adminUnlockOpen = false;
     this.adminPanelOpen = false;
     this.adminPinValue = '';
+    this.adminUnlocking = false;
     if (this.adminSessionTimeoutId) clearTimeout(this.adminSessionTimeoutId);
   }
 
@@ -1670,9 +1704,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       else if (entity.state === 'unavailable') toast = { icon: 'cloud_off', title: friendlyName, detail: 'Appareil indisponible' };
       if (toast) {
         const item = { ...toast, id: ++this.toastSequence };
-        this.homeToasts = [...this.homeToasts.slice(-2), item];
         const safetyAlert = ['smoke','carbon_monoxide','gas','moisture','safety'].includes(String(entity.attributes['device_class'] || ''));
-        setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), (safetyAlert ? 12 : preferences.durationSeconds) * 1000);
+        this.showToast(item, (safetyAlert ? 12 : preferences.durationSeconds) * 1000);
       }
     }
   }
@@ -1702,14 +1735,21 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private showOfflineToast(): void {
     if (!this.dashboardSettings.notifications.system) return;
     const item: HomeToast = { id: ++this.toastSequence, icon: 'cloud_off', title: 'Mode hors ligne', detail: 'Cette action sera disponible après la reconnexion.' };
-    this.homeToasts = [...this.homeToasts.slice(-2), item];
-    setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 3500);
+    this.showToast(item, 3500);
   }
 
   private showActionToast(title: string, detail: string, tone: 'success' | 'error' = 'success'): void {
     const item: HomeToast = { id: ++this.toastSequence, icon: tone === 'success' ? 'check_circle' : 'error', title, detail };
+    this.showToast(item, 2200);
+  }
+
+  private showToast(item: HomeToast, durationMs: number): void {
     this.homeToasts = [...this.homeToasts.slice(-2), item];
-    setTimeout(() => this.homeToasts = this.homeToasts.filter((candidate) => candidate.id !== item.id), 2200);
+    const fadeDurationMs = 360;
+    setTimeout(() => {
+      this.homeToasts = this.homeToasts.map((toast) => toast.id === item.id ? { ...toast, leaving: true } : toast);
+      setTimeout(() => this.homeToasts = this.homeToasts.filter((toast) => toast.id !== item.id), fadeDurationMs);
+    }, Math.max(0, durationMs - fadeDurationMs));
   }
 
   private translateClimateStatus(value: string): string {
