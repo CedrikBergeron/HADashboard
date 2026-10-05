@@ -94,7 +94,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private readonly climateDialCenterX = 120;
   private readonly climateDialCenterY = 110;
   private readonly climateDialRadius = 86;
-  private fullscreenAttempted = false;
 
   now = '19:58';
 
@@ -365,29 +364,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.adminUnlockOpen = true;
     this.adminPinValue = '';
     this.adminPinError = '';
-  }
-
-  /**
-   * iPadOS only grants the Fullscreen API from a trusted touch/click.  Keeping
-   * this at the page level means the first normal touch can enter immersive
-   * mode, rather than asking the user to find a setting in administration.
-   */
-  onUserGesture(): void {
-    if ((!this.dashboardSettings.tabletMode && !this.isIPadDevice) || this.fullscreenAttempted || document.fullscreenElement) return;
-    const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
-    if (window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone) return;
-
-    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
-    const request = root.requestFullscreen?.bind(root) ?? root.webkitRequestFullscreen?.bind(root);
-    if (!request) return;
-
-    this.fullscreenAttempted = true;
-    try {
-      const result = request();
-      if (result && typeof result.catch === 'function') result.catch(() => { this.fullscreenAttempted = false; });
-    } catch {
-      this.fullscreenAttempted = false;
-    }
   }
 
   @HostListener('document:fullscreenchange')

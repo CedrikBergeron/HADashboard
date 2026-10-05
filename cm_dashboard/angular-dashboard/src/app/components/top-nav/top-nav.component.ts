@@ -17,6 +17,7 @@ export interface TopNavActionChip {
 export class TopNavComponent implements OnDestroy {
   private clockLongPressTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private floorTransitionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private floorSwapTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private _items: NavItem[] = [];
   private pendingFloor: string | null = null;
 
@@ -54,6 +55,7 @@ export class TopNavComponent implements OnDestroy {
 
   currentFloor = 'main';
   floorAnimationAlternate = false;
+  floorMenuTransition: 'idle' | 'leaving' | 'entering' = 'idle';
 
   get visibleItems(): NavItem[] {
     return this.items.filter((item) => item.floor === this.currentFloor);
@@ -82,15 +84,22 @@ export class TopNavComponent implements OnDestroy {
     }
 
     this.pendingFloor = targetFloor;
-    this.currentFloor = targetFloor;
-    this.floorAnimationAlternate = !this.floorAnimationAlternate;
-    this.onItemClick(targetItem);
+    this.floorMenuTransition = 'leaving';
 
     if (this.floorTransitionTimeoutId) clearTimeout(this.floorTransitionTimeoutId);
-    this.floorTransitionTimeoutId = setTimeout(() => {
-      this.pendingFloor = null;
-      this.floorTransitionTimeoutId = null;
-    }, 420);
+    if (this.floorSwapTimeoutId) clearTimeout(this.floorSwapTimeoutId);
+    this.floorSwapTimeoutId = setTimeout(() => {
+      this.currentFloor = targetFloor;
+      this.floorAnimationAlternate = !this.floorAnimationAlternate;
+      this.floorMenuTransition = 'entering';
+      this.onItemClick(targetItem);
+      this.floorSwapTimeoutId = null;
+      this.floorTransitionTimeoutId = setTimeout(() => {
+        this.pendingFloor = null;
+        this.floorMenuTransition = 'idle';
+        this.floorTransitionTimeoutId = null;
+      }, 360);
+    }, 170);
   }
 
   ngOnInit(): void {
@@ -99,6 +108,7 @@ export class TopNavComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.cancelClockLongPress();
     if (this.floorTransitionTimeoutId) clearTimeout(this.floorTransitionTimeoutId);
+    if (this.floorSwapTimeoutId) clearTimeout(this.floorSwapTimeoutId);
   }
 
   onItemClick(item: NavItem): void {

@@ -1,4 +1,4 @@
-<header class="topbar">
+<header class="topbar" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
   <nav class="nav" aria-label="Navigation principale">
     <button
       type="button"
@@ -11,7 +11,7 @@
       (contextmenu)="$event.preventDefault()"
       aria-label="Heure actuelle">{{ time }}</button>
 
-    <div class="menu-wrapper">
+    <div class="menu-wrapper" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
       @for (item of visibleItems; track item.value) {
       <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)">
         <span class="material-symbols-outlined nav-room-icon" aria-hidden="true">{{ item.icon || 'meeting_room' }}</span>

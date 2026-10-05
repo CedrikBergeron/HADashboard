@@ -1,6 +1,6 @@
 name: "CM Dashboard"
 description: "Angular Dashboard for Home Assistant"
-version: "1.4.18"
+version: "1.4.23"
 slug: "cm_dashboard"
 init: false
 startup: services

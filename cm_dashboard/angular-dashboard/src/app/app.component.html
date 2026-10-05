@@ -5,8 +5,7 @@
   [class.ipad-device]="isIPadDevice"
   [class.is-native-fullscreen]="fullscreenActive"
   [style.--glass-opacity]="dashboardSettings.glassOpacity"
-  [class.is-screensaver]="screensaverActive"
-  (pointerdown)="onUserGesture()">
+  [class.is-screensaver]="screensaverActive">
   @for (background of roomBackgrounds; track background.roomValue) {
     <img
       class="bg-image"

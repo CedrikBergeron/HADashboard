@@ -302,8 +302,39 @@
 }
 
 .menu-wrapper {
-  animation: fadeIn 0.3s ease-in-out;
   min-height: 44px;
+  transition: opacity 170ms ease;
+}
+
+.menu-wrapper.is-floor-leaving {
+  opacity: 0;
+}
+
+.menu-wrapper.is-floor-entering {
+  animation: floorMenuFadeIn 360ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+/* Hide the layout swap itself, then bring every visible element of the bar
+   back together.  This prevents the centre items and utility icons from
+   visibly snapping to their new positions when a floor has a different count
+   of rooms. */
+.topbar.is-floor-leaving .menu-wrapper,
+.topbar.is-floor-leaving .action-cluster {
+  opacity: 0;
+}
+
+.topbar.is-floor-entering .action-cluster {
+  animation: topNavContentFadeIn 360ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes topNavContentFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes floorMenuFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .floor-badge-label.floor-transition-a {
@@ -325,7 +356,8 @@
 }
 
 :host-context(.reduced-motion) .menu-wrapper,
-:host-context(.reduced-motion) .floor-badge-label {
+:host-context(.reduced-motion) .floor-badge-label,
+:host-context(.reduced-motion) .action-cluster {
   animation-duration: 1ms;
 }
 
