@@ -3,7 +3,7 @@ import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChange
 import { FormsModule } from '@angular/forms';
 import { NavItem } from '../../models/NavItem';
 import { DashboardApiService } from '../../service/dashboard-api.service';
-import type { DashboardBackup, DashboardDevice, DashboardFloor, DashboardSettings, HassConnectionStatus, SystemHealth } from '../../service/dashboard-api.service';
+import type { DashboardBackup, DashboardConfiguration, DashboardDevice, DashboardFloor, DashboardSettings, HassConnectionStatus, SystemHealth } from '../../service/dashboard-api.service';
 
 export interface AdminRoom {
   id: string;
@@ -35,6 +35,9 @@ const DEFAULT_BACKGROUND_SETTINGS = { positionX: 50, positionY: 50, brightness: 
 })
 export class AdminPanelComponent implements OnChanges, OnInit {
   private draftInitialized = false;
+  @Input() saving = false;
+  @Input() saved = false;
+  @Input() saveError = '';
   @Input() rooms: NavItem[] = [];
   @Input() entities: AdminEntityOption[] = [];
   @Input() floors: DashboardFloor[] = [];
@@ -44,7 +47,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<AdminSavePayload>();
 
-  activeSection: 'rooms' | 'security' | 'video' | 'notifications' | 'connection' | 'system' | 'appearance' = 'rooms';
+  activeSection: 'rooms' | 'security' | 'video' | 'notifications' | 'connection' | 'system' | 'appearance' | 'configurations' = 'rooms';
   draftRooms: AdminRoom[] = [];
   draftFloors: DashboardFloor[] = [];
   selectedRoomId = '';
@@ -87,6 +90,94 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   deviceMessage = '';
   devicesLoading = false;
   fullscreenMessage = '';
+  configurations: DashboardConfiguration[] = [];
+  configurationName = '';
+  configurationRename = '';
+  configurationMessage = '';
+  configurationBusy = false;
+  configurationLoading = false;
+  pendingConfigurationId = '';
+  chosenConfigurationId = '';
+  showArchivedConfigurations = false;
+  get activeConfigurationId(): string { return this.api.activeConfigurationId; }
+  get chosenConfiguration(): DashboardConfiguration | undefined { return this.configurations.find((entry) => entry.id === this.chosenConfigurationId); }
+  get visibleConfigurations(): DashboardConfiguration[] { return this.configurations.filter((entry) => !entry.archivedAt || this.showArchivedConfigurations); }
+  get activeConfigurationName(): string { return this.configurations.find((entry) => entry.id === this.activeConfigurationId)?.name || 'Configuration principale'; }
+  chooseLibraryConfiguration(): void { this.configurationRename = this.chosenConfiguration?.name || ''; }
+  async openConfigurations(): Promise<void> {
+    this.activeSection = 'configurations';
+    this.configurationLoading = true;
+    try {
+      this.configurations = await this.api.getConfigurations();
+      if (!this.configurations.some((entry) => entry.id === this.chosenConfigurationId)) this.chosenConfigurationId = this.activeConfigurationId;
+      this.chooseLibraryConfiguration();
+    } catch { this.configurationMessage = 'Impossible de charger les configurations. Déverrouillez de nouveau l’administration si la session a expiré.'; }
+    finally { this.configurationLoading = false; }
+  }
+  private async configurationAction(action: () => Promise<void>, message: string): Promise<void> {
+    if (this.configurationBusy) return;
+    this.configurationBusy = true; this.configurationMessage = '';
+    try { await action(); await this.openConfigurations(); this.configurationMessage = message; }
+    catch (error) { this.configurationMessage = (error as { error?: { error?: string } }).error?.error || 'L’opération a échoué. Vérifiez la connexion et votre session administrateur.'; }
+    finally { this.configurationBusy = false; }
+  }
+  async saveAsConfiguration(): Promise<void> {
+    await this.configurationAction(async () => {
+      const dashboard = this.api.configurationDocument(this.draftRooms, this.draftFloors, this.draftSettings, { floorId: this.draftDeviceDefaultFloorId, roomId: this.draftDeviceDefaultRoomId });
+      const created = await this.api.createConfiguration(this.configurationName, dashboard);
+      this.chosenConfigurationId = created.id; this.configurationName = '';
+    }, 'Nouvelle configuration enregistrée sur le serveur. Vous pouvez maintenant la charger sur cet iPad ou un autre.');
+  }
+  async duplicateConfiguration(): Promise<void> {
+    const chosen = this.chosenConfiguration;
+    if (!chosen) return;
+    await this.configurationAction(async () => {
+      const source = await this.api.readConfiguration(chosen.id);
+      const created = await this.api.createConfiguration(`${source.name.slice(0, 65)} — copie`, source.dashboard);
+      this.chosenConfigurationId = created.id;
+    }, 'Copie indépendante créée sur le serveur.');
+  }
+  async renameConfiguration(): Promise<void> {
+    await this.configurationAction(() => this.api.renameConfiguration(this.chosenConfigurationId, this.configurationRename), 'Configuration renommée.');
+  }
+  async archiveConfiguration(archived: boolean): Promise<void> {
+    if (archived && !window.confirm('Archiver cette configuration? Les tablettes qui l’utilisent reviendront à la configuration principale à leur prochain chargement. Vous pourrez la rétablir ici.')) return;
+    await this.configurationAction(() => this.api.archiveConfiguration(this.chosenConfigurationId, archived), archived ? 'Configuration archivée. Activez « Afficher les archives » pour la rétablir.' : 'Configuration rétablie.');
+    if (archived) { this.chosenConfigurationId = this.activeConfigurationId; this.chooseLibraryConfiguration(); }
+  }
+  useConfiguration(): void {
+    if (!this.chosenConfiguration || this.chosenConfiguration.archivedAt || this.chosenConfigurationId === this.activeConfigurationId) return;
+    this.pendingConfigurationId = this.chosenConfigurationId;
+  }
+  confirmConfigurationSwitch(): void {
+    if (this.pendingConfigurationId) this.api.selectConfiguration(this.pendingConfigurationId);
+  }
+  async exportConfiguration(): Promise<void> {
+    const chosen = this.chosenConfiguration;
+    if (!chosen) return;
+    await this.configurationAction(async () => {
+      const source = await this.api.readConfiguration(chosen.id);
+      const blob = new Blob([JSON.stringify({ format: 'home-dashboard-configuration', version: 1, name: source.name, dashboard: source.dashboard }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url; link.download = `dashboard-${chosen.id}.json`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'Fichier exporté. Les images restent hébergées sur ce serveur; les identifiants Home Assistant et le NIP ne sont pas inclus.');
+  }
+  async importConfiguration(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 4_000_000) { this.configurationMessage = 'Le fichier doit faire moins de 4 Mo.'; return; }
+    await this.configurationAction(async () => {
+      let value;
+      try { value = JSON.parse(await file.text()); } catch { throw { error: { error: 'Le fichier ne contient pas un JSON valide.' } }; }
+      if (value?.format !== 'home-dashboard-configuration' || value.version !== 1) throw { error: { error: 'Choisissez un fichier exporté depuis la bibliothèque de configurations.' } };
+      const created = await this.api.createConfiguration(value.name, value.dashboard);
+      this.chosenConfigurationId = created.id;
+    }, 'Configuration importée sur le serveur, sans remplacer les configurations existantes.');
+  }
+
 
   constructor(private readonly api: DashboardApiService) {}
 
@@ -116,6 +207,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   ngOnInit(): void {
     try { this.favoriteIcons = JSON.parse(localStorage.getItem('dashboard-favorite-icons') || '[]'); } catch {}
     void this.loadDevices();
+    void this.api.getConfigurations().then((entries) => this.configurations = entries).catch(() => {});
   }
 
   async loadDevices(): Promise<void> {
@@ -142,6 +234,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['saved'] && this.saved) this.saveState = 'saved';
     if (changes['rooms'] && !this.draftInitialized) {
       this.draftRooms = this.rooms.map((room) => ({
         id: room.value ?? this.slugify(room.label),
@@ -330,7 +423,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
 
   saveChanges(): void {
     this.save.emit({ rooms: this.draftRooms.map((room) => ({ ...room })), floors: this.draftFloors.map((floor) => ({ ...floor })), settings: { ...this.draftSettings }, deviceDefaultFloorId: this.draftDeviceDefaultFloorId, deviceDefaultRoomId: this.draftDeviceDefaultRoomId });
-    this.saveState = 'saved';
+    this.saveState = 'idle';
   }
 
   onDefaultRoomChange(): void {
@@ -396,7 +489,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
 
   async restoreBackup(backup: DashboardBackup): Promise<void> {
     if (!window.confirm(`Restaurer la configuration du ${new Date(backup.createdAt).toLocaleString('fr-CA')}?`)) return;
-    try { await this.api.restoreBackup(backup.id); this.systemMessage = 'Sauvegarde restaurée. Rechargez le tableau de bord.'; }
+    try { await this.api.restoreBackup(backup.id); location.reload(); }
     catch { this.systemMessage = 'La restauration a échoué.'; }
   }
 

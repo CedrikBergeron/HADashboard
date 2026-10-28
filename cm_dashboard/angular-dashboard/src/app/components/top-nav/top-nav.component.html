@@ -8,6 +8,7 @@
       (pointerup)="cancelClockLongPress()"
       (pointercancel)="cancelClockLongPress()"
       (pointerleave)="cancelClockLongPress()"
+      (keydown.enter)="clockLongPress.emit()"
       (contextmenu)="$event.preventDefault()"
       aria-label="Heure actuelle">{{ time }}</button>
 

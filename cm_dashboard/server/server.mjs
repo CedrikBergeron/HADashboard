@@ -6,9 +6,10 @@ import { randomBytes, timingSafeEqual, scrypt as scryptCallback, createHash } fr
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
+import { configurationStore, ConfigurationError } from './configurations.mjs';
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)));
-const dataDir = join(root, 'data');
+const dataDir = process.env.DASHBOARD_DATA_DIR || join(root, 'data');
 const defaultsDir = join(root, 'defaults');
 const homesDir = join(dataDir, 'homes');
 const backupsDir = join(dataDir, 'backups');
@@ -60,7 +61,7 @@ async function saveAdminPin(pin) {
   const salt = randomBytes(16).toString('hex');
   const hash = await scrypt(pin, salt, 64);
   const target = join(secretsDir, 'admin.json');
-  const temporary = `${target}.${process.pid}.tmp`;
+  const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
   await writeFile(temporary, JSON.stringify({ salt, hash: hash.toString('hex'), updatedAt: new Date().toISOString() }), { mode: 0o600 });
   await rename(temporary, target);
 }
@@ -126,7 +127,7 @@ async function hassSecret() {
 
 async function saveHassSecret(url, token) {
   const target = join(secretsDir, 'home-assistant.json');
-  const temporary = `${target}.${process.pid}.tmp`;
+  const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
   await writeFile(temporary, JSON.stringify({ url: url.replace(/\/$/, ''), token, updatedAt: new Date().toISOString() }), { mode: 0o600 });
   await rename(temporary, target);
 }
@@ -163,7 +164,7 @@ function allowCors(req, res) {
   if (origin === 'http://localhost:4200' || origin === 'http://127.0.0.1:4200' || developmentOrigin) {
     res.setHeader('access-control-allow-origin', origin);
     res.setHeader('access-control-allow-headers', 'content-type,x-admin-session');
-    res.setHeader('access-control-allow-methods', 'GET,PUT,POST,OPTIONS');
+    res.setHeader('access-control-allow-methods', 'GET,PUT,POST,PATCH,OPTIONS');
     res.setHeader('access-control-allow-credentials', 'true');
   }
 }
@@ -234,11 +235,13 @@ async function saveHome(id, value) {
   const target = join(homesDir, `${safeId}.json`);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   try { await copyFile(target, join(backupsDir, `${safeId}-${timestamp}.json`)); } catch {}
-  const temporary = `${target}.${process.pid}.tmp`;
+  const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   await rename(temporary, target);
   await pruneOldBackups();
 }
+
+const configurations = configurationStore({ directory: join(dataDir, 'configurations', 'main'), readMain: () => readHome('main'), saveMain: (value) => saveHome('main', value), validHome });
 
 async function iconCatalog() {
   const cacheFile = join(cacheDir, 'material-symbols.json');
@@ -352,6 +355,38 @@ async function api(req, res, url) {
     target.revokedAt = new Date().toISOString();
     await saveDeviceRegistry(registry);
     return json(res, 200, { revoked: true });
+  }
+  const configurationMatch = url.pathname.match(/^\/api\/homes\/main\/configurations(?:\/(main|cfg-[a-f0-9-]{36}))?(?:\/(archive|history|restore)(?:\/([a-zA-Z0-9.-]+))?)?$/);
+  if (configurationMatch) {
+    const [, id, action, backupId] = configurationMatch;
+    // A trusted tablet may read its selected dashboard. Library management requires admin access.
+    if (!(req.method === 'GET' && id && !action) && !authorized(req)) return json(res, 401, { error: 'Session administrateur expirée' });
+    try {
+      if (!id && req.method === 'GET') return json(res, 200, { configurations: await configurations.list() });
+      if (!id && req.method === 'POST') {
+        const value = await body(req, 4_000_000);
+        if (value.format && (value.format !== 'home-dashboard-configuration' || value.version !== 1)) return json(res, 400, { error: 'Format de configuration non pris en charge.' });
+        return json(res, 201, await configurations.create(value.name, value.dashboard));
+      }
+      if (id && !action && req.method === 'GET') return json(res, 200, await configurations.read(id));
+      if (id && !action && req.method === 'PUT') { await configurations.save(id, await body(req, 4_000_000)); return json(res, 200, { saved: true }); }
+      if (id && !action && req.method === 'PATCH') { await configurations.rename(id, (await body(req)).name); return json(res, 200, { saved: true }); }
+      if (id && action === 'archive' && req.method === 'POST') { await configurations.archive(id, (await body(req)).archived !== false); return json(res, 200, { saved: true }); }
+      if (id && action === 'history' && req.method === 'GET') return json(res, 200, { backups: id === 'main' ? await listBackups('main') : await configurations.backups(id) });
+      if (id && action === 'restore' && backupId && req.method === 'POST') {
+        if (id === 'main') {
+          if (!backupId.startsWith('main-') || !backupId.endsWith('.json')) throw new ConfigurationError('Sauvegarde invalide.');
+          const restored = JSON.parse(await readFile(join(backupsDir, backupId), 'utf8'));
+          if (!validHome(restored)) throw new ConfigurationError('Sauvegarde corrompue.');
+          await saveHome('main', restored);
+        } else await configurations.restore(id, backupId);
+        return json(res, 200, { restored: true });
+      }
+      return json(res, 405, { error: 'Opération non disponible.' });
+    } catch (error) {
+      if (error instanceof ConfigurationError) return json(res, error.status, { error: error.message });
+      throw error;
+    }
   }
   if (req.method === 'GET' && url.pathname === '/api/icons') return json(res, 200, await iconCatalog());
   if (req.method === 'GET' && url.pathname === '/api/backups') {

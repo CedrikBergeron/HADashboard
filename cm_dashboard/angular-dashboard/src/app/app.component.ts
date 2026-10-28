@@ -126,6 +126,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   adminUnlocking = false;
   fullscreenActive = false;
   adminSaveError = '';
+  adminSaving = false;
+  adminSaved = false;
   deviceAuthorized: boolean | null = null;
   activationCode = '';
   activationName = 'Tablette murale';
@@ -141,8 +143,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   doorbellOpen = false;
   motionCameraPopup: SecurityCamera | null = null;
   motionCameraSnapshotNonce = 0;
-  deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor') || 'main';
-  deviceDefaultRoomId = localStorage.getItem('ha-dashboard-default-room') || '';
+  deviceDefaultFloorId = 'main';
+  deviceDefaultRoomId = '';
   readonly isIPadDevice = navigator.maxTouchPoints > 1 && /iPad|Macintosh/.test(navigator.userAgent);
   dashboardFloors: DashboardFloor[] = [{ id: 'main', name: 'Main floor', icon: 'home' }];
   get roomBackgrounds(): Array<{ roomValue: string; src: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number }> {
@@ -249,7 +251,10 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   private dashboardPresenceInitialized = false;
   private screensaverWakeOverrideActive = false;
 
-  constructor(private readonly hass: HassService, private readonly dashboardApi: DashboardApiService) {}
+  constructor(private readonly hass: HassService, private readonly dashboardApi: DashboardApiService) {
+    this.deviceDefaultFloorId = localStorage.getItem('ha-dashboard-default-floor' + this.dashboardApi.deviceStorageSuffix) || 'main';
+    this.deviceDefaultRoomId = localStorage.getItem('ha-dashboard-default-room' + this.dashboardApi.deviceStorageSuffix) || '';
+  }
 
   ngOnInit(): void {
     void this.checkDeviceAccess();
@@ -431,7 +436,19 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   async saveAdminRooms(payload: AdminSavePayload): Promise<void> {
+    if (this.adminSaving) return;
     const { rooms, floors, settings, deviceDefaultFloorId, deviceDefaultRoomId } = payload;
+    this.adminSaving = true;
+    this.adminSaved = false;
+    this.adminSaveError = '';
+    try {
+      await this.dashboardApi.saveHome(rooms, floors, settings, { floorId: deviceDefaultFloorId, roomId: deviceDefaultRoomId });
+    } catch {
+      this.adminSaveError = 'La sauvegarde serveur a échoué. Vos modifications restent dans l’éditeur; réessayez ou déverrouillez l’administration.';
+      return;
+    } finally { this.adminSaving = false; }
+    this.adminSaved = true;
+    this.refreshAdminSession();
     this.adminRoomsOverride = rooms.map((room) => ({ ...room }));
     this.dashboardSettings = { ...settings };
     this.applyInterfaceSettings();
@@ -439,8 +456,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     this.dashboardFloors = floors.map((floor) => ({ ...floor }));
     this.deviceDefaultFloorId = deviceDefaultFloorId || floors[0]?.id || 'main';
     this.deviceDefaultRoomId = rooms.some((room) => room.id === deviceDefaultRoomId) ? deviceDefaultRoomId : rooms[0]?.id || '';
-    localStorage.setItem('ha-dashboard-default-floor', this.deviceDefaultFloorId);
-    localStorage.setItem('ha-dashboard-default-room', this.deviceDefaultRoomId);
+    localStorage.setItem('ha-dashboard-default-floor' + this.dashboardApi.deviceStorageSuffix, this.deviceDefaultFloorId);
+    localStorage.setItem('ha-dashboard-default-room' + this.dashboardApi.deviceStorageSuffix, this.deviceDefaultRoomId);
     this.dashboardPresenceInitialized = false;
     if (!settings.screensaverEntityId) {
       this.dashboardPresenceActive = true;
@@ -461,13 +478,6 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       background: room.background
     }));
     if (!activeStillExists && this.navItems[0]) this.setActiveRoom(this.navItems[0].value ?? 'entree', this.navItems[0].label);
-    try {
-      await this.dashboardApi.saveHome(rooms, floors, settings);
-      this.adminSaveError = '';
-      this.refreshAdminSession();
-    } catch {
-      this.adminSaveError = 'La sauvegarde serveur a échoué. Déverrouillez de nouveau l’administration.';
-    }
   }
 
   private async loadSavedHome(): Promise<void> {
@@ -480,13 +490,15 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       // Restart it so the configured inactivity delay is actually respected.
       if (!this.screensaverActive) this.resetInactivityTimer();
       this.dashboardFloors = home.floors;
+      if (!this.deviceDefaultRoomId) this.deviceDefaultRoomId = home.dashboardDefaults?.roomId || '';
+      if (home.dashboardDefaults?.floorId && !localStorage.getItem('ha-dashboard-default-floor' + this.dashboardApi.deviceStorageSuffix)) this.deviceDefaultFloorId = home.dashboardDefaults.floorId;
       const defaultRoom = home.rooms.find((room) => room.id === this.deviceDefaultRoomId)
         ?? home.rooms.find((room) => room.floor === this.deviceDefaultFloorId)
         ?? home.rooms[0];
       this.deviceDefaultRoomId = defaultRoom?.id || '';
       if (defaultRoom) this.deviceDefaultFloorId = defaultRoom.floor;
-      localStorage.setItem('ha-dashboard-default-room', this.deviceDefaultRoomId);
-      localStorage.setItem('ha-dashboard-default-floor', this.deviceDefaultFloorId);
+      localStorage.setItem('ha-dashboard-default-room' + this.dashboardApi.deviceStorageSuffix, this.deviceDefaultRoomId);
+      localStorage.setItem('ha-dashboard-default-floor' + this.dashboardApi.deviceStorageSuffix, this.deviceDefaultFloorId);
       this.navItems = home.rooms.map((room, index) => ({
         label: room.name,
         value: room.id,

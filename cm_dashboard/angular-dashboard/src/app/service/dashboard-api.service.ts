@@ -15,13 +15,36 @@ export type DashboardBackup = { id: string; createdAt: string; size: number };
 export type HassConnectionStatus = { configured: boolean; connected: boolean; url?: string };
 export type DashboardDevice = { id: string; name: string; createdAt: string; lastSeenAt: string; revokedAt?: string };
 export type DeviceStatus = { authorized: boolean; setupRequired: boolean; device?: { id: string; name: string } | null };
-type StoredHome = { id: string; name: string; rooms: StoredRoom[]; floors?: DashboardFloor[]; settings?: Partial<DashboardSettings> };
+export type StoredHome = { id: string; name: string; rooms: StoredRoom[]; floors?: DashboardFloor[]; settings?: Partial<DashboardSettings>; dashboardDefaults?: { floorId: string; roomId: string } };
+
+export type DashboardConfiguration = { id: string; name: string; roomCount: number; homeName: string; createdAt?: string; updatedAt?: string; archivedAt?: string | null };
 
 @Injectable({ providedIn: 'root' })
 export class DashboardApiService {
   private readonly devServerOrigin = `${location.protocol}//${location.hostname}:3000`;
   private readonly baseUrl = location.port === '4200' ? `${this.devServerOrigin}/api` : '/api';
   private adminToken = '';
+  readonly activeConfigurationId = localStorage.getItem('ha-dashboard-configuration') || 'main';
+  get deviceStorageSuffix(): string { return this.activeConfigurationId === 'main' ? '' : `-${this.activeConfigurationId}`; }
+  selectConfiguration(id: string): void { localStorage.setItem('ha-dashboard-configuration', id); location.reload(); }
+  private get configurationUrl(): string { return `${this.baseUrl}/homes/main/configurations/${encodeURIComponent(this.activeConfigurationId)}`; }
+  private get adminHeaders(): HttpHeaders { return new HttpHeaders({ 'x-admin-session': this.adminToken }); }
+  async getConfigurations(): Promise<DashboardConfiguration[]> {
+    return (await firstValueFrom(this.http.get<{ configurations: DashboardConfiguration[] }>(`${this.baseUrl}/homes/main/configurations`, { headers: this.adminHeaders }))).configurations;
+  }
+  async readConfiguration(id: string): Promise<{ name: string; dashboard: StoredHome }> {
+    return await firstValueFrom(this.http.get<{ name: string; dashboard: StoredHome }>(`${this.baseUrl}/homes/main/configurations/${encodeURIComponent(id)}`));
+  }
+  async createConfiguration(name: string, dashboard: StoredHome): Promise<DashboardConfiguration> {
+    return await firstValueFrom(this.http.post<DashboardConfiguration>(`${this.baseUrl}/homes/main/configurations`, { format: 'home-dashboard-configuration', version: 1, name, dashboard }, { headers: this.adminHeaders }));
+  }
+  async renameConfiguration(id: string, name: string): Promise<void> {
+    await firstValueFrom(this.http.patch(`${this.baseUrl}/homes/main/configurations/${encodeURIComponent(id)}`, { name }, { headers: this.adminHeaders }));
+  }
+  async archiveConfiguration(id: string, archived: boolean): Promise<void> {
+    await firstValueFrom(this.http.post(`${this.baseUrl}/homes/main/configurations/${encodeURIComponent(id)}/archive`, { archived }, { headers: this.adminHeaders }));
+  }
+
 
   constructor(private readonly http: HttpClient) {}
 
@@ -49,10 +72,19 @@ export class DashboardApiService {
     await firstValueFrom(this.http.post(`${this.baseUrl}/admin/devices/${id}/revoke`, {}, { headers }));
   }
 
-  async getHome(): Promise<{ id: string; name: string; rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings }> {
-    const home = await firstValueFrom(this.http.get<StoredHome>(`${this.baseUrl}/homes/main`));
+  async getHome(): Promise<{ id: string; name: string; rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; dashboardDefaults?: { floorId: string; roomId: string } }> {
+    let home: StoredHome;
+    try { home = (await this.readConfiguration(this.activeConfigurationId)).dashboard; }
+    catch (error) {
+      if ((error as { status?: number }).status === 404 && this.activeConfigurationId !== 'main') {
+        localStorage.removeItem('ha-dashboard-configuration');
+        location.reload();
+      }
+      throw error;
+    }
     return {
       id: home.id,
+      dashboardDefaults: home.dashboardDefaults,
       name: home.name,
       floors: home.floors?.length ? home.floors : [{ id: 'main', name: 'Main floor', icon: 'home' }],
       rooms: home.rooms.map((room) => ({
@@ -98,22 +130,18 @@ export class DashboardApiService {
     };
   }
 
-  async saveHome(rooms: AdminRoom[], floors: DashboardFloor[], settings: DashboardSettings): Promise<void> {
-    const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
-    await firstValueFrom(this.http.put(`${this.baseUrl}/homes/main`, {
-      id: 'main',
-      name: settings.homeName || 'My home',
-      floors,
-      settings,
+  configurationDocument(rooms: AdminRoom[], floors: DashboardFloor[], settings: DashboardSettings, defaults: { floorId: string; roomId: string }): StoredHome {
+    return {
+      id: 'main', name: settings.homeName || 'My home', floors, settings, dashboardDefaults: defaults,
       rooms: rooms.map((room) => ({
         id: room.id, name: room.name, floor: room.floor,
         icon: { name: room.icon, style: room.iconStyle, filled: room.iconFilled },
-        controls: room.controls,
-        climate: room.climate,
-        vacuum: room.vacuum,
-        background: room.background
+        controls: room.controls, climate: room.climate, vacuum: room.vacuum, background: room.background
       }))
-    }, { headers }));
+    };
+  }
+  async saveHome(rooms: AdminRoom[], floors: DashboardFloor[], settings: DashboardSettings, defaults: { floorId: string; roomId: string }): Promise<void> {
+    await firstValueFrom(this.http.put(this.configurationUrl, this.configurationDocument(rooms, floors, settings, defaults), { headers: this.adminHeaders }));
   }
 
   async changeAdminPin(pin: string): Promise<void> {
@@ -147,13 +175,13 @@ export class DashboardApiService {
 
   async getBackups(): Promise<DashboardBackup[]> {
     const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
-    const response = await firstValueFrom(this.http.get<{ backups: DashboardBackup[] }>(`${this.baseUrl}/backups`, { headers }));
+    const response = await firstValueFrom(this.http.get<{ backups: DashboardBackup[] }>(`${this.configurationUrl}/history`, { headers }));
     return response.backups;
   }
 
   async restoreBackup(id: string): Promise<void> {
     const headers = new HttpHeaders({ 'x-admin-session': this.adminToken });
-    await firstValueFrom(this.http.post(`${this.baseUrl}/backups/${encodeURIComponent(id)}/restore`, {}, { headers }));
+    await firstValueFrom(this.http.post(`${this.configurationUrl}/restore/${encodeURIComponent(id)}`, {}, { headers }));
   }
 
   async getHassStatus(): Promise<HassConnectionStatus> { return await firstValueFrom(this.http.get<HassConnectionStatus>(`${this.baseUrl}/home-assistant/status`)); }

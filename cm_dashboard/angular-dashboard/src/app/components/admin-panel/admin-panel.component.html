@@ -1,7 +1,7 @@
 <div class="admin-shell" role="dialog" aria-modal="true" aria-label="Administration du tableau de bord">
   <header class="admin-header">
     <div>
-      <span class="eyebrow">Maison principale</span>
+      <span class="eyebrow">{{ draftSettings.homeName }} · {{ activeConfigurationName }}</span>
       <h1>Administration</h1>
     </div>
     <button type="button" class="icon-button" (click)="close.emit()" aria-label="Fermer l'administration">
@@ -32,12 +32,49 @@
       <button type="button" [class.active]="activeSection === 'appearance'" (click)="activeSection = 'appearance'">
         <span class="material-symbols-outlined">palette</span><span>Apparence et tablette</span>
       </button>
+      <button type="button" [class.active]="activeSection === 'configurations'" (click)="openConfigurations()">
+        <span class="material-symbols-outlined">dashboard_customize</span><span>Configurations</span>
+      </button>
       <div class="nav-spacer"></div>
       <div class="admin-status"><span></span> Mode administrateur</div>
     </nav>
 
     <main class="admin-content">
-      @if (activeSection === 'rooms') {
+      @if (activeSection === 'configurations') {
+        <div class="content-heading"><div><h2>Configurations de la maison</h2><p>Enregistrez plusieurs dashboards sur le serveur et choisissez celui de chaque iPad.</p></div><button type="button" class="secondary-button" [disabled]="configurationBusy || configurationLoading" (click)="openConfigurations()">Actualiser</button></div>
+        <div class="configuration-current"><span class="material-symbols-outlined">tablet_mac</span><div><small>Configuration utilisée sur cet écran</small><strong>{{ activeConfigurationName }}</strong><p>Les iPad utilisant la même configuration partagent ses modifications enregistrées. Dupliquez-la pour créer une variante indépendante.</p></div></div>
+        @if (configurationMessage) { <div class="settings-message" role="status" aria-live="polite">{{ configurationMessage }}</div> }
+        @if (pendingConfigurationId) {
+          <section class="configuration-confirm" role="alert" aria-live="assertive"><strong>Charger la configuration sur cet iPad?</strong><p>Les modifications non enregistrées dans l’éditeur seront abandonnées. Les autres iPad conservent leur sélection.</p><div class="configuration-actions"><button type="button" class="secondary-button" (click)="pendingConfigurationId = ''">Annuler le chargement</button><button type="button" class="primary-button" (click)="confirmConfigurationSwitch()">Confirmer et charger</button></div></section>
+        }
+        <div class="configuration-grid">
+          <section class="settings-card">
+            <div class="settings-card-heading"><span class="material-symbols-outlined">cloud_done</span><div><h3>Bibliothèque du serveur</h3><p>Accessible depuis tous les iPad autorisés de cette maison.</p></div></div>
+            @if (configurationLoading) { <p role="status">Chargement…</p> }
+            <label>Configuration<select [(ngModel)]="chosenConfigurationId" (ngModelChange)="chooseLibraryConfiguration()" [disabled]="configurationBusy || configurationLoading">@for (entry of visibleConfigurations; track entry.id) { <option [value]="entry.id">{{ entry.name }}{{ entry.archivedAt ? ' · Archivée' : '' }}{{ entry.id === activeConfigurationId ? ' · Cet écran' : '' }}</option> }</select></label>
+            <label class="configuration-checkbox"><input type="checkbox" [(ngModel)]="showArchivedConfigurations" (ngModelChange)="chosenConfigurationId = activeConfigurationId; chooseLibraryConfiguration()">Afficher les archives</label>
+            @if (chosenConfiguration; as entry) {
+              <p class="configuration-detail">{{ entry.roomCount }} pièces · {{ entry.homeName }}@if (entry.updatedAt) { <br>Enregistrée le {{ entry.updatedAt | date:'medium' }} }</p>
+              @if (!entry.archivedAt) {
+                <button type="button" class="primary-button" [disabled]="configurationBusy || saving || entry.id === activeConfigurationId" (click)="useConfiguration()">{{ entry.id === activeConfigurationId ? 'Déjà utilisée sur cet écran' : 'Charger sur cet iPad' }}</button>
+                <div class="configuration-actions"><button type="button" class="secondary-button" [disabled]="configurationBusy" (click)="duplicateConfiguration()">Dupliquer</button><button type="button" class="secondary-button" [disabled]="configurationBusy" (click)="exportConfiguration()">Exporter JSON</button></div>
+                @if (entry.id !== 'main') {
+                  <label>Nom<input [(ngModel)]="configurationRename" maxlength="80" [disabled]="configurationBusy"></label>
+                  <div class="configuration-actions"><button type="button" class="secondary-button" [disabled]="configurationBusy || !configurationRename.trim()" (click)="renameConfiguration()">Renommer</button><button type="button" class="secondary-button" [disabled]="configurationBusy || entry.id === activeConfigurationId" (click)="archiveConfiguration(true)">Archiver</button></div>
+                  @if (entry.id === activeConfigurationId) { <small>Chargez une autre configuration avant d’archiver celle-ci.</small> }
+                }
+              } @else { <button type="button" class="secondary-button" [disabled]="configurationBusy" (click)="archiveConfiguration(false)">Rétablir la configuration</button> }
+            }
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><span class="material-symbols-outlined">add_to_photos</span><div><h3>Créer une variante</h3><p>Enregistre le contenu actuel de l’éditeur dans une nouvelle configuration indépendante.</p></div></div>
+            <label>Nom de la nouvelle configuration<input [(ngModel)]="configurationName" maxlength="80" placeholder="Ex. iPad cuisine · Résidence Brazeau" [disabled]="configurationBusy"></label>
+            <button type="button" class="primary-button" [disabled]="configurationBusy || saving || !configurationName.trim() || !draftRooms.length" (click)="saveAsConfiguration()">{{ configurationBusy ? 'Opération en cours…' : 'Enregistrer comme nouvelle configuration' }}</button>
+            <p class="configuration-detail">Inclut les pièces, étages, contrôles, images, réglages et la pièce d’accueil. La sélection de cet écran reste inchangée jusqu’à « Charger sur cet iPad ».</p>
+            <div class="configuration-import"><h3>Importer un fichier</h3><p>Ajoute une configuration exportée, sans écraser les autres.</p><label class="secondary-button configuration-file">Choisir un fichier JSON<input type="file" accept="application/json,.json" [disabled]="configurationBusy" (change)="importConfiguration($event)"></label><small>Sur le même serveur, il suffit de choisir la configuration dans la bibliothèque. L’import n’est pas nécessaire sur chaque iPad. Les fichiers JSON référencent les images de leur serveur d’origine.</small></div>
+          </section>
+        </div>
+      } @else if (activeSection === 'rooms') {
         <div class="content-heading">
           <div><h2>Pièces et étages</h2><p>Organisez ce qui apparaît dans la navigation de la maison.</p></div>
           <div class="heading-actions"><button type="button" class="secondary-button" (click)="floorManagerOpen = true"><span class="material-symbols-outlined">layers</span>Gérer les étages</button><button type="button" class="primary-button" (click)="addRoom()"><span class="material-symbols-outlined">add</span>Ajouter une pièce</button></div>
@@ -136,14 +173,14 @@
         <section class="notification-duration"><span class="material-symbols-outlined">timer</span><label>Durée des bannières · {{ draftSettings.notifications.durationSeconds }} secondes<input type="range" min="3" max="12" step="1" [(ngModel)]="draftSettings.notifications.durationSeconds" (ngModelChange)="saveState = 'idle'"><small>Les commandes ordinaires restent silencieuses. Les alertes critiques demeurent visibles plus longtemps.</small></label></section>
       } @else if (activeSection === 'appearance') {
         <div class="content-heading"><div><h2>Apparence et tablette</h2><p>Adaptez le tableau de bord à l’écran et à son environnement.</p></div></div><div class="settings-grid"><section class="settings-card"><div class="settings-card-heading"><span class="material-symbols-outlined">tune</span><div><h3>Interface</h3><p>Réglages globaux appliqués à toutes les pièces.</p></div></div><label>Nom de la maison<input [(ngModel)]="draftSettings.homeName" (ngModelChange)="saveState = 'idle'" maxlength="60" placeholder="La maison" autocomplete="off"></label><label>Taille de l’interface · {{ (draftSettings.fontScale * 100).toFixed(0) }} %<input type="range" min="0.85" max="1.25" step="0.05" [(ngModel)]="draftSettings.fontScale" (ngModelChange)="saveState = 'idle'"></label><label>Intensité du verre · {{ (draftSettings.glassOpacity * 100).toFixed(0) }} %<input type="range" min="0.55" max="1.25" step="0.05" [(ngModel)]="draftSettings.glassOpacity" (ngModelChange)="saveState = 'idle'"></label><div class="feature-row"><div><span class="material-symbols-outlined">motion_photos_off</span><span><strong>Réduire les animations</strong><small>Transitions plus courtes et sans mouvement</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.reducedMotion" (ngModelChange)="saveState = 'idle'"><span></span></label></div><div class="feature-row"><div><span class="material-symbols-outlined">schedule</span><span><strong>Format 24 heures</strong><small>Afficher 19:30 plutôt que 7:30 PM</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.clock24h" (ngModelChange)="saveState = 'idle'"><span></span></label></div></section><section class="settings-card"><div class="settings-card-heading"><span class="material-symbols-outlined">tablet_mac</span><div><h3>Mode tablette murale</h3><p>Optimisations pour un écran dédié toujours ouvert.</p></div></div><div class="feature-row"><div><span class="material-symbols-outlined">fullscreen</span><span><strong>Mode tablette</strong><small>Interface tactile et curseur discret</small></span></div><label class="switch-control"><input type="checkbox" [(ngModel)]="draftSettings.tabletMode" (ngModelChange)="saveState = 'idle'"><span></span></label></div><label>Veille après {{ draftSettings.inactivityMinutes }} minutes<input type="range" min="1" max="30" step="1" [(ngModel)]="draftSettings.inactivityMinutes" (ngModelChange)="saveState = 'idle'"></label><button type="button" class="secondary-button settings-action fullscreen-action" (click)="enterFullscreen()"><span class="material-symbols-outlined">fullscreen</span>Afficher en plein écran</button>@if (fullscreenMessage) { <div class="settings-message">{{ fullscreenMessage }}</div> }<div class="settings-hint"><span class="material-symbols-outlined">info</span><span>Sur iPad, ajoutez le dashboard à l’écran d’accueil pour qu’il s’ouvre toujours sans les barres de Safari.</span></div></section></div>
-        <section class="device-floor-setting"><span class="material-symbols-outlined">tablet_mac</span><label>Pièce par défaut de cet écran<select [(ngModel)]="draftDeviceDefaultRoomId" (ngModelChange)="onDefaultRoomChange()">@for (room of draftRooms; track room.id) { <option [value]="room.id">{{ room.name }} · {{ floorLabel(room.floor) }} — {{ room.id }}</option> }</select><small>Cette pièce et son étage seront ouverts au prochain chargement. Ce choix est conservé uniquement sur cette tablette.</small></label></section>
+        <section class="device-floor-setting"><span class="material-symbols-outlined">tablet_mac</span><label>Pièce par défaut de cet écran<select [(ngModel)]="draftDeviceDefaultRoomId" (ngModelChange)="onDefaultRoomChange()">@for (room of draftRooms; track room.id) { <option [value]="room.id">{{ room.name }} · {{ floorLabel(room.floor) }} — {{ room.id }}</option> }</select><small>Cette pièce et son étage seront ouverts au prochain chargement. Ce choix est conservé sur cette tablette et sert aussi de pièce d’accueil sur un nouvel iPad chargeant cette configuration.</small></label></section>
       } @else if (activeSection === 'system') {
         <div class="content-heading"><div><h2>Système et sauvegardes</h2><p>Surveillez le serveur et restaurez une configuration précédente.</p></div><button type="button" class="secondary-button" (click)="openSystem()"><span class="material-symbols-outlined">refresh</span>Actualiser</button></div>
         @if (systemLoading) { <div class="icons-loading system-loader"><span class="material-symbols-outlined">progress_activity</span>Chargement du système…</div> }
         @else {
           <div class="health-grid"><article><span class="status-dot" [class.warning]="systemHealth?.status !== 'ok'"></span><div><small>Serveur</small><strong>{{ systemHealth?.status === 'ok' ? 'Opérationnel' : 'Attention requise' }}</strong></div></article><article><span class="material-symbols-outlined">schedule</span><div><small>Temps actif</small><strong>{{ ((systemHealth?.uptime || 0) / 60).toFixed(0) }} minutes</strong></div></article><article><span class="material-symbols-outlined">database</span><div><small>Configuration</small><strong>{{ systemHealth?.homeReadable ? 'Accessible' : 'Indisponible' }}</strong></div></article></div>
           <section class="technical-health-card"><div class="technical-health-heading"><div><span class="material-symbols-outlined">dns</span><div><h3>Santé technique</h3><p>Infrastructure détectée automatiquement dans Home Assistant.</p></div></div>@if (technicalHealthConfigured) { <span class="technical-overall" [class.warning]="technicalIssues.length > 0"><i></i>{{ technicalIssues.length ? technicalIssues.length + ' anomalie' + (technicalIssues.length > 1 ? 's' : '') : 'Tout est opérationnel' }}</span> }</div><div class="technical-health-grid">@for (group of technicalHealthGroups; track group.id) { <article [class.not-configured]="group.total === 0" [class.warning]="group.issues.length > 0"><span class="material-symbols-outlined">{{ group.icon }}</span><div><small>{{ group.detail }}</small><strong>{{ group.label }}</strong><em>@if (group.total) { {{ group.healthy }} sur {{ group.total }} opérationnel{{ group.healthy > 1 ? 's' : '' }} } @else { Non détecté }</em></div><i></i></article> }</div>@if (technicalIssues.length) { <div class="technical-issues"><h4>Éléments à vérifier</h4>@for (issue of technicalIssues; track issue.entityId) { <div><span class="material-symbols-outlined">warning</span><p><strong>{{ issue.name }}</strong><small>{{ issue.entityId }}</small></p><em>{{ issue.state }}</em></div> }</div> } @else if (!technicalHealthConfigured) { <div class="technical-empty"><span class="material-symbols-outlined">info</span>Les équipements apparaîtront ici dès que UniFi Protect, UniFi Network, l’UPS ou les capteurs du rack seront intégrés à Home Assistant.</div> }</section>
-          <section class="backup-card"><div class="backup-heading"><div><h3>Versions précédentes</h3><p>Une version est créée automatiquement avant chaque enregistrement.</p></div><span>{{ backups.length }}</span></div>@for (backup of backups; track backup.id) { <div class="backup-row"><span class="material-symbols-outlined">history</span><div><strong>{{ backup.createdAt | date:'medium' }}</strong><small>{{ (backup.size / 1024).toFixed(1) }} Ko</small></div><button type="button" (click)="restoreBackup(backup)">Restaurer</button></div> } @empty { <div class="compact-empty">Aucune sauvegarde disponible pour le moment.</div> }</section>
+          <section class="backup-card"><div class="backup-heading"><div><h3>Versions précédentes</h3><p>Historique de la configuration utilisée sur cet écran. Une version est créée avant chaque enregistrement et conservée 30 jours.</p></div><span>{{ backups.length }}</span></div>@for (backup of backups; track backup.id) { <div class="backup-row"><span class="material-symbols-outlined">history</span><div><strong>{{ backup.createdAt | date:'medium' }}</strong><small>{{ (backup.size / 1024).toFixed(1) }} Ko</small></div><button type="button" (click)="restoreBackup(backup)">Restaurer</button></div> } @empty { <div class="compact-empty">Aucune sauvegarde disponible pour le moment.</div> }</section>
         }
         @if (systemMessage) { <div class="settings-message system-message">{{ systemMessage }}</div> }
       } @else {
@@ -154,9 +191,9 @@
   </div>
 
   <footer class="admin-footer">
-    <span class="save-message">@if (saveState === 'saved') { Modifications appliquées à cette session }</span>
+    <span class="save-message" role="status">@if (saving) { Enregistrement sur le serveur… } @else if (saveError) { Échec de l’enregistrement } @else if (saveState === 'saved') { Configuration enregistrée sur le serveur }</span>
     <button type="button" class="secondary-button" (click)="close.emit()">Fermer</button>
-    <button type="button" class="primary-button" (click)="saveChanges()">Enregistrer</button>
+    <button type="button" class="primary-button" [disabled]="saving || configurationBusy" (click)="saveChanges()">{{ saving ? 'Enregistrement…' : 'Enregistrer la configuration active' }}</button>
   </footer>
 
   @if (iconPickerOpen) {
