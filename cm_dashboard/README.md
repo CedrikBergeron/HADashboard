@@ -18,3 +18,11 @@ Dans l’administration (maintenir l’heure 1,5 seconde, ou sélectionner l’h
 La configuration historique reste dans `data/homes/main.json`. Les configurations nommées se trouvent dans `data/configurations/main/`, avec leur historique dans `history/<id>/`. La sélection active et la pièce d’accueil propre à chaque configuration sont mémorisées dans le navigateur de l’iPad. La pièce d’accueil enregistrée sur le serveur sert de valeur initiale aux nouveaux écrans. La connexion Home Assistant et les appareils autorisés restent communs à la maison.
 
 Validation serveur : `node --test server/configurations.test.mjs`.
+
+### Pièces, étages et entités Home Assistant
+
+Dans l’administration, « Pièce Home Assistant » propose les areas disponibles. Choisir une area propose son nom et son étage, tout en conservant un nom affiché personnalisable. Les étages Home Assistant peuvent aussi être ajoutés depuis « Gérer les étages », puis renommés librement. Les pièces et étages existants ne sont pas remplacés automatiquement.
+
+Les sélecteurs des commandes, du climat et de l’aspirateur cochent par défaut « Afficher uniquement les entités de cette pièce ». L’area affectée directement à une entité a priorité sur celle de son appareil. Décochez pour inclure les autres pièces et les entités sans affectation, y compris les entités présentes uniquement dans les états Home Assistant. Les filtres par type et la recherche restent actifs.
+
+Une pièce sans area, ou dont l’area a été supprimée, propose toutes les entités avec une explication. Une ancienne pièce peut reconnaître une area par un nom identique et unique; son renommage conserve alors la liaison. « Sans area Home Assistant » désactive cette reconnaissance. Les entités déjà configurées sont préservées, même si elles appartiennent à une autre pièce. Le registre des étages reste facultatif pour les anciennes versions de Home Assistant.

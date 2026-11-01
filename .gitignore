@@ -8,3 +8,4 @@ cm_dashboard/angular-dashboard/public/assets/
 .env
 cm_dashboard/angular-dashboard/dist/
 cm_dashboard/angular-dashboard/node_modules/
+cm_dashboard/angular-dashboard/.angular/

@@ -1,3 +1,4 @@
+import { AsyncPipe } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { combineLatest, Subscription } from 'rxjs';
@@ -56,7 +57,7 @@ const DEFAULT_ROOM_VALUE = 'room';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule, TopNavComponent, BottomControlBarComponent, AdminPanelComponent],
+  imports: [AsyncPipe, FormsModule, TopNavComponent, BottomControlBarComponent, AdminPanelComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -410,13 +411,20 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     if (this.adminSessionTimeoutId) clearTimeout(this.adminSessionTimeoutId);
   }
 
+  get adminHassFloors$() { return this.hass.floors$; }
+  get adminHassAreas$() { return this.hass.areas$; }
+
   get adminEntityOptions(): AdminEntityOption[] {
-    return this.latestEntityRegistry
+    const registeredIds = new Set(this.latestEntityRegistry.map((entry) => entry.entity_id));
+    const registry: HassEntityRegistryEntry[] = [...this.latestEntityRegistry, ...Object.keys(this.latestEntities).filter((id) => !registeredIds.has(id)).map((entity_id) => ({ entity_id }))];
+    const deviceAreas = new Map(this.latestDevices.map((device) => [device.id, device.area_id]));
+    return registry
       .filter((entry) => !entry.disabled_by && !entry.hidden_by)
       .map((entry) => ({
         entityId: entry.entity_id,
         name: String(this.latestEntities[entry.entity_id]?.attributes?.['friendly_name'] || entry.name || entry.original_name || entry.entity_id),
-        state: this.latestEntities[entry.entity_id]?.state || 'indisponible'
+        state: this.latestEntities[entry.entity_id]?.state || 'indisponible',
+        areaId: entry.area_id ?? deviceAreas.get(entry.device_id || '')
       }))
       .sort((left, right) => left.name.localeCompare(right.name, 'fr'));
   }
@@ -468,6 +476,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       label: room.name,
       value: room.id,
       floor: room.floor,
+      areaId: room.areaId,
       active: activeStillExists ? room.id === this.activeRoomValue : index === 0,
       icon: room.icon,
       iconStyle: room.iconStyle,
@@ -503,6 +512,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         label: room.name,
         value: room.id,
         floor: room.floor,
+        areaId: room.areaId,
         active: room.id === defaultRoom?.id,
         icon: room.icon,
         iconStyle: room.iconStyle,
@@ -932,6 +942,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
         label: room.name,
         value: room.id,
         floor: room.floor,
+        areaId: room.areaId,
         active: room.id === this.activeRoomValue || (!this.activeRoomValue && index === 0),
         icon: room.icon,
         iconStyle: room.iconStyle,
@@ -956,6 +967,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       const slug = this.slugify(area.name);
       return {
         label: area.name,
+        areaId: area.area_id,
         value: slug,
         floor: this.getFloorForRoom(slug),
         active: slug === this.activeRoomValue || (!this.activeRoomValue && index === 0)
@@ -1039,11 +1051,18 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
 
   private buildRoomAreaIdsByValue(areas: HassAreaRegistryEntry[]): Record<string, string> {
-    return areas.reduce<Record<string, string>>((accumulator, area) => {
+    const mapping = areas.reduce<Record<string, string>>((accumulator, area) => {
       const roomSlug = this.slugify(area.name);
       accumulator[roomSlug] = area.area_id;
       return accumulator;
     }, {});
+    for (const room of this.adminRoomsOverride || []) {
+      if (room.areaId !== undefined) {
+        delete mapping[room.id];
+        if (areas.some((area) => area.area_id === room.areaId)) mapping[room.id] = room.areaId;
+      }
+    }
+    return mapping;
   }
 
   private buildRoomClimate(

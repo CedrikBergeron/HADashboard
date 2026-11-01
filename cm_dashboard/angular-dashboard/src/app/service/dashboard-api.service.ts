@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type { AdminRoom } from '../components/admin-panel/admin-panel.component';
 
-type StoredRoom = { id: string; name: string; floor: string; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
+type StoredRoom = { areaId?: string; id: string; name: string; floor: string; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
 export type NotificationPreferences = { security: boolean; safety: boolean; criticalDevices: boolean; system: boolean; durationSeconds: number };
 export type SecurityCamera = { entityId: string; name: string; zone: 'exterior' | 'entrance' | 'interior'; motionEntityId: string; motionPopupEnabled: boolean };
 export type SecurityAccessPoint = { name: string; zone: 'exterior' | 'entrance' | 'interior'; lockEntityId: string; contactEntityId: string };
@@ -90,7 +90,7 @@ export class DashboardApiService {
       rooms: home.rooms.map((room) => ({
         id: room.id,
         name: room.name,
-        floor: room.floor,
+        floor: room.floor, areaId: room.areaId,
         icon: room.icon?.name || 'meeting_room',
         iconStyle: room.icon?.style === 'rounded' || room.icon?.style === 'sharp' ? room.icon.style : 'outlined',
         iconFilled: room.icon?.filled === true,
@@ -134,7 +134,7 @@ export class DashboardApiService {
     return {
       id: 'main', name: settings.homeName || 'My home', floors, settings, dashboardDefaults: defaults,
       rooms: rooms.map((room) => ({
-        id: room.id, name: room.name, floor: room.floor,
+        id: room.id, name: room.name, floor: room.floor, areaId: room.areaId,
         icon: { name: room.icon, style: room.iconStyle, filled: room.iconFilled },
         controls: room.controls, climate: room.climate, vacuum: room.vacuum, background: room.background
       }))

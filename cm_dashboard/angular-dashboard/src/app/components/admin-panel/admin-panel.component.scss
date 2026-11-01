@@ -166,3 +166,10 @@ input:focus, select:focus { border-color: rgba(255,255,255,.32); }
 .admin-nav { overflow-y:auto; }
 .configuration-confirm { display:grid; gap:14px; margin:20px 0; padding:20px; border:1px solid #c8aa7155; border-radius:14px; background:#c8aa710a; }
 .configuration-confirm p { color:#b4bdc6; font-size:.85rem; line-height:1.6; }
+
+.room-entity-scope { padding: 12px 24px; label { display: flex; align-items: center; gap: 10px; } input { width: 20px; height: 20px; flex-shrink: 0; } p { font-size: 13px; opacity: .75; } }
+.hass-floor-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 24px; }
+
+.entity-picker.room-scoped { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
+.floor-manager { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.hass-floor-suggestions { max-height: 120px; overflow: auto; }

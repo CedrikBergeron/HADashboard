@@ -7,6 +7,8 @@ export interface HassStateChangedEvent {
   old_state?: HassEntityState | null;
 }
 
+export interface HassFloorRegistryEntry { floor_id: string; name: string; level?: number | null; }
+
 export interface HassAreaRegistryEntry {
   area_id: string;
   name: string;
@@ -73,6 +75,8 @@ export class HassService {
   private readonly connectedSubject = new BehaviorSubject<boolean>(false);
 
   readonly entities$ = this.entitiesSubject.asObservable();
+  private readonly floorsSubject = new BehaviorSubject<HassFloorRegistryEntry[]>(this.readCache('floors', []));
+  readonly floors$ = this.floorsSubject.asObservable();
   readonly areas$ = this.areasSubject.asObservable();
   readonly devices$ = this.devicesSubject.asObservable();
   readonly entityRegistry$ = this.entityRegistrySubject.asObservable();
@@ -230,14 +234,17 @@ export class HassService {
 
   private async bootstrap(): Promise<void> {
     try {
-      const [areas, devices, entityRegistry, states, services] = await Promise.all([
+      const [areas, devices, entityRegistry, states, services, floors] = await Promise.all([
         this.sendCommand<HassAreaRegistryEntry[]>({ type: 'config/area_registry/list' }),
         this.sendCommand<HassDeviceRegistryEntry[]>({ type: 'config/device_registry/list' }),
         this.sendCommand<HassEntityRegistryEntry[]>({ type: 'config/entity_registry/list' }),
         this.sendCommand<HassEntityState[]>({ type: 'get_states' }),
-        this.sendCommand<HassServiceCatalog>({ type: 'get_services' })
+        this.sendCommand<HassServiceCatalog>({ type: 'get_services' }),
+        this.sendCommand<HassFloorRegistryEntry[]>({ type: 'config/floor_registry/list' }).catch(() => [] as HassFloorRegistryEntry[])
       ]);
 
+      this.floorsSubject.next(floors);
+      this.saveCache('floors', floors);
       this.areasSubject.next(areas);
       this.devicesSubject.next(devices);
       this.entityRegistrySubject.next(entityRegistry);

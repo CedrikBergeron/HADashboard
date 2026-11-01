@@ -3,5 +3,6 @@ export interface NavItem {
   active?: boolean;
   value?: string;
   floor?: string;
+  areaId?: string;
   icon?: string;
 }

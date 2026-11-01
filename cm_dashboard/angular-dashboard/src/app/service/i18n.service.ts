@@ -2,6 +2,12 @@ import { Injectable } from '@angular/core';
 import type { DashboardLanguage } from './dashboard-api.service';
 
 const ENGLISH_PHRASES: Array<[string, string]> = [
+  ['Pièce Home Assistant', 'Home Assistant room'], ['Sans area Home Assistant', 'No Home Assistant area'], ['Area indisponible', 'Area unavailable'],
+  ['Choisissez une pièce proposée, puis personnalisez son nom et son étage librement.', 'Choose a suggested room, then customize its name and floor freely.'],
+  ['Afficher uniquement les entités de cette pièce', 'Show only entities in this room'],
+  ['Décochez pour inclure les autres pièces et les entités sans affectation.', 'Uncheck to include other rooms and unassigned entities.'],
+  ['Aucune area disponible pour cette pièce : toutes les entités sont proposées.', 'No area is available for this room: all entities are listed.'],
+  ['Décochez le filtre de pièce pour élargir la recherche.', 'Uncheck the room filter to broaden the search.'], ['Ajouter ou utiliser', 'Add or use'],
   ['Maison principale', 'Main home'], ['Ma maison', 'My home'], ['La maison', 'My home'], ['Rez-de-chaussée', 'Ground floor'], ['Sous-sol', 'Basement'],
   ['Salle à Manger', 'Dining room'], ['Salle à manger', 'Dining room'], ['Salle de bain', 'Bathroom'], ['Buanderie', 'Laundry room'], ['Chambre', 'Bedroom'], ['Salon', 'Living room'], ['Entrée', 'Entry'],
   ['Pièces', 'Rooms'], ['Sécurité', 'Security'], ['Apparence', 'Appearance'], ['Système', 'System'], ['Connexion', 'Connection'], ['Caméras', 'Cameras'],

@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import type { HassAreaRegistryEntry, HassFloorRegistryEntry } from '../../service/hass.service';
 import { NavItem } from '../../models/NavItem';
 import { DashboardApiService } from '../../service/dashboard-api.service';
 import type { DashboardBackup, DashboardConfiguration, DashboardDevice, DashboardFloor, DashboardSettings, HassConnectionStatus, SystemHealth } from '../../service/dashboard-api.service';
 
 export interface AdminRoom {
+  areaId?: string;
   id: string;
   name: string;
   floor: string;
@@ -20,7 +22,7 @@ export interface AdminRoom {
 export interface AdminRoomControl { id: string; label: string; entityId: string; icon: string; tapAction?: 'toggle' | 'turn_on' | 'turn_off'; holdAction?: 'none' | 'toggle' | 'turn_on' | 'turn_off'; confirm?: boolean; }
 export interface AdminRoomBackground { url: string; positionX: number; positionY: number; brightness: number; saturation: number; contrast: number; overlay: number; }
 
-export interface AdminEntityOption { entityId: string; name: string; state: string; }
+export interface AdminEntityOption { entityId: string; name: string; state: string; areaId?: string | null; }
 type TechnicalHealthGroup = { id: string; label: string; icon: string; total: number; healthy: number; issues: AdminEntityOption[]; detail: string };
 export interface AdminSavePayload { rooms: AdminRoom[]; floors: DashboardFloor[]; settings: DashboardSettings; deviceDefaultFloorId: string; deviceDefaultRoomId: string; }
 const DEFAULT_SETTINGS: DashboardSettings = { language: 'en', homeName: 'My home', screensaverEntityId: '', screensaverActiveState: 'on', fontScale: 1, glassOpacity: 1, reducedMotion: false, clock24h: true, tabletMode: false, inactivityMinutes: 5, notifications: { security: true, safety: true, criticalDevices: true, system: true, durationSeconds: 5 }, security: { enabled: false, cameras: [], accessPoints: [], motionPopupsEnabled: true, motionPopupDurationSeconds: 15, doorbellEntityId: '', doorbellCameraEntityId: '', doorLockEntityId: '', entryLightEntityId: '', doorbellDurationSeconds: 25 } };
@@ -35,6 +37,9 @@ const DEFAULT_BACKGROUND_SETTINGS = { positionX: 50, positionY: 50, brightness: 
 })
 export class AdminPanelComponent implements OnChanges, OnInit {
   private draftInitialized = false;
+  @Input() hassAreas: HassAreaRegistryEntry[] = [];
+  @Input() hassFloors: HassFloorRegistryEntry[] = [];
+  onlyRoomEntities = true;
   @Input() saving = false;
   @Input() saved = false;
   @Input() saveError = '';
@@ -240,6 +245,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
         id: room.value ?? this.slugify(room.label),
         name: room.label,
         floor: room.floor ?? 'main',
+        areaId: room.areaId,
         icon: (room as NavItem & { icon?: string }).icon || 'meeting_room',
         iconStyle: (room as NavItem & { iconStyle?: AdminRoom['iconStyle'] }).iconStyle || 'outlined',
         iconFilled: (room as NavItem & { iconFilled?: boolean }).iconFilled || false,
@@ -256,6 +262,51 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     if (changes['floors'] && changes['floors'].firstChange) this.draftFloors = this.floors.map((floor) => ({ ...floor }));
     if (changes['deviceDefaultFloorId'] && changes['deviceDefaultFloorId'].firstChange) this.draftDeviceDefaultFloorId = this.deviceDefaultFloorId || 'main';
     if (changes['deviceDefaultRoomId'] && changes['deviceDefaultRoomId'].firstChange) this.draftDeviceDefaultRoomId = this.deviceDefaultRoomId || this.draftRooms[0]?.id || '';
+  }
+
+  get isRoomEntityPicker(): boolean { return ['control', 'climate', 'vacuum'].includes(this.entityPickerMode); }
+
+  get selectedRoomArea(): HassAreaRegistryEntry | undefined {
+    const room = this.selectedRoom;
+    if (!room) return undefined;
+    if (room.areaId !== undefined) return this.hassAreas.find((area) => area.area_id === room.areaId);
+    // Legacy rooms are matched only when their name identifies a unique area.
+    const matches = this.hassAreas.filter((area) => this.normalizeSearch(area.name) === this.normalizeSearch(room.name));
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  renameRoom(name: string): void {
+    const room = this.selectedRoom;
+    if (!room) return;
+    const area = this.selectedRoomArea;
+    if (room.areaId === undefined && area) room.areaId = area.area_id;
+    room.name = name;
+    this.saveState = 'idle';
+  }
+
+  chooseArea(areaId: string): void {
+    const room = this.selectedRoom;
+    if (!room) return;
+    room.areaId = areaId;
+    const area = this.hassAreas.find((entry) => entry.area_id === areaId);
+    if (area) {
+      room.name = area.name;
+      const floor = this.hassFloors.find((entry) => entry.floor_id === area.floor_id);
+      if (floor) room.floor = this.useHassFloor(floor);
+    }
+    this.saveState = 'idle';
+  }
+
+  useHassFloor(floor: HassFloorRegistryEntry): string {
+    const existing = this.draftFloors.find((entry) => this.normalizeSearch(entry.name) === this.normalizeSearch(floor.name));
+    if (existing) return existing.id;
+    const base = this.slugify(floor.floor_id) || 'etage';
+    let id = base;
+    let suffix = 2;
+    while (this.draftFloors.some((entry) => entry.id === id)) id = `${base}-${suffix++}`;
+    this.draftFloors = [...this.draftFloors, { id, name: floor.name, icon: 'stairs' }];
+    this.saveState = 'idle';
+    return id;
   }
 
   get selectedRoom(): AdminRoom | undefined {
@@ -293,7 +344,9 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     const query = this.normalizeSearch(this.entityQuery);
     const domain = (id: string) => id.split('.')[0];
     const allowed = ['securityCamera','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : ['doorLock','accessLock'].includes(this.entityPickerMode) ? ['lock'] : this.entityPickerMode === 'accessContact' ? ['binary_sensor'] : this.entityPickerMode === 'cameraMotion' ? ['binary_sensor','event','sensor'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
-    const scoped = allowed ? this.entities.filter((entity) => allowed.includes(domain(entity.entityId))) : this.entities;
+    const areaId = this.selectedRoomArea?.area_id;
+    const source = this.isRoomEntityPicker && this.onlyRoomEntities && areaId ? this.entities.filter((entity) => entity.areaId === areaId) : this.entities;
+    const scoped = allowed ? source.filter((entity) => allowed.includes(domain(entity.entityId))) : source;
     if (!query) return scoped.slice(0, 250);
     return scoped.filter((entity) => this.normalizeSearch(`${entity.name} ${entity.entityId} ${entity.state}`).includes(query)).slice(0, 250);
   }
@@ -547,6 +600,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   }
 
   openEntityPicker(mode: typeof this.entityPickerMode, controlIndex = -1): void {
+    this.onlyRoomEntities = true;
     this.entityPickerMode = mode;
     this.entityPickerControlIndex = controlIndex;
     this.entityQuery = '';
