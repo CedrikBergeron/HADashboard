@@ -13,12 +13,12 @@
       aria-label="Heure actuelle">{{ time }}</button>
 
     <div class="menu-wrapper" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
-      @for (item of visibleItems; track item.value) {
-      <button type="button" class="nav-btn" [class.active]="item.active" (click)="onItemClick(item)">
-        <span class="material-symbols-outlined nav-room-icon" aria-hidden="true">{{ item.icon || 'meeting_room' }}</span>
-        <span class="nav-room-label">{{ item.label }}</span>
+      <button type="button" class="room-trigger" [disabled]="floorChangePending || !visibleItems.length"
+        aria-haspopup="dialog" aria-controls="room-picker" [attr.aria-expanded]="roomMenuOpen" (click)="openRoomMenu()">
+        <span class="material-symbols-outlined" aria-hidden="true">{{ selectedItem?.icon || 'meeting_room' }}</span>
+        <span class="room-trigger-label">{{ selectedItem?.label || 'Choisir une pièce' }}</span>
+        <span class="material-symbols-outlined room-trigger-arrow" aria-hidden="true">expand_more</span>
       </button>
-      }
     </div>
 
     <div class="action-cluster">
@@ -55,3 +55,31 @@
     </div>
   </nav>
 </header>
+
+
+<dialog #roomDialog id="room-picker" class="room-picker" aria-labelledby="room-picker-title" aria-describedby="room-picker-floor"
+  (click)="onRoomBackdropClick($event)" (cancel)="cancelRoomMenu($event)" (close)="roomMenuOpen = false">
+  <section class="room-picker-panel">
+    <header class="room-picker-header">
+      <div><p id="room-picker-floor">{{ currentFloorLabel }}</p><h2 id="room-picker-title">Choisir une pièce</h2></div>
+      <button type="button" class="room-picker-close" (click)="closeRoomMenu()" aria-label="Fermer le menu des pièces">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </header>
+    <div class="room-grid">
+        @for (item of visibleItems; track item.value) {
+          <button type="button" class="room-card" [class.is-selected]="item.active" [attr.aria-current]="item.active ? 'page' : null" (click)="onItemClick(item)">
+            @if (roomBackground(item); as background) {
+              <img class="room-card-photo" [src]="background.src" alt="" loading="lazy" decoding="async"
+                [style.object-position]="background.positionX + '% ' + background.positionY + '%'" (error)="imageFailed(background.src)">
+            } @else {
+              <span class="material-symbols-outlined room-card-fallback" aria-hidden="true">{{ item.icon || 'meeting_room' }}</span>
+            }
+            <span class="room-card-shade" aria-hidden="true"></span>
+            <span class="room-card-name">{{ item.label }}</span>
+            @if (item.active) { <span class="material-symbols-outlined room-card-check" aria-hidden="true">check</span> }
+          </button>
+        } @empty { <p class="room-picker-empty">Aucune pièce sur cet étage.</p> }
+    </div>
+  </section>
+</dialog>

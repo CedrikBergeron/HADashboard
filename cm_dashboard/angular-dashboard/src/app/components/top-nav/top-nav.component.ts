@@ -1,6 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
 import { NavItem } from '../../models/NavItem';
+
+export interface RoomMenuBackground {
+  roomValue: string;
+  src: string;
+  positionX: number;
+  positionY: number;
+}
 
 export interface TopNavActionChip {
   label: string;
@@ -37,6 +44,11 @@ export class TopNavComponent implements OnDestroy {
     return this._items;
   }
 
+  @ViewChild('roomDialog', { static: true }) roomDialog!: ElementRef<HTMLDialogElement>;
+  @Input() roomBackgrounds: RoomMenuBackground[] = [];
+  roomMenuOpen = false;
+  private readonly failedImages = new Set<string>();
+
   @Input() time = '';
   @Input() floors: Array<{ id: string; name: string; icon: string }> = [];
   private _defaultFloor = 'main';
@@ -61,6 +73,39 @@ export class TopNavComponent implements OnDestroy {
     return this.items.filter((item) => item.floor === this.currentFloor);
   }
 
+  get selectedItem(): NavItem | undefined {
+    return this.visibleItems.find((item) => item.active);
+  }
+
+  roomBackground(item: NavItem): RoomMenuBackground | undefined {
+    return this.roomBackgrounds.find((background) => background.roomValue === item.value && !this.failedImages.has(background.src));
+  }
+
+  imageFailed(src: string): void { this.failedImages.add(src); }
+
+  openRoomMenu(): void {
+    if (this.floorChangePending || this.roomMenuOpen) return;
+    this.roomDialog.nativeElement.showModal();
+    this.roomMenuOpen = true;
+    const selected = this.roomDialog.nativeElement.querySelector<HTMLButtonElement>('.room-card.is-selected');
+    selected?.focus({ preventScroll: true });
+    selected?.scrollIntoView({ block: 'nearest' });
+  }
+
+  closeRoomMenu(): void {
+    this.roomDialog.nativeElement.close();
+    this.roomMenuOpen = false;
+  }
+
+  onRoomBackdropClick(event: MouseEvent): void {
+    if (event.target === this.roomDialog.nativeElement) this.closeRoomMenu();
+  }
+
+  cancelRoomMenu(event: Event): void {
+    event.preventDefault();
+    this.closeRoomMenu();
+  }
+
   get floorChangePending(): boolean {
     return this.pendingFloor !== null;
   }
@@ -83,6 +128,7 @@ export class TopNavComponent implements OnDestroy {
       return;
     }
 
+    this.closeRoomMenu();
     this.pendingFloor = targetFloor;
     this.floorMenuTransition = 'leaving';
 
@@ -112,6 +158,7 @@ export class TopNavComponent implements OnDestroy {
   }
 
   onItemClick(item: NavItem): void {
+    this.closeRoomMenu();
     this.itemClick.emit(item);
   }
 

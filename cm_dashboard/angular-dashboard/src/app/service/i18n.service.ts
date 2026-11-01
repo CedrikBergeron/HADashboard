@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import type { DashboardLanguage } from './dashboard-api.service';
 
 const ENGLISH_PHRASES: Array<[string, string]> = [
+  ['Choisir une pièce', 'Choose a room'], ['Fermer le menu des pièces', 'Close room picker'], ['Aucune pièce sur cet étage.', 'No rooms on this floor.'],
   ['Pièce Home Assistant', 'Home Assistant room'], ['Sans area Home Assistant', 'No Home Assistant area'], ['Area indisponible', 'Area unavailable'],
   ['Choisissez une pièce proposée, puis personnalisez son nom et son étage librement.', 'Choose a suggested room, then customize its name and floor freely.'],
   ['Afficher uniquement les entités de cette pièce', 'Show only entities in this room'],
