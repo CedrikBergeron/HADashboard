@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import type { AdminRoom } from '../components/admin-panel/admin-panel.component';
 
 type StoredRoom = { areaId?: string; id: string; name: string; floor: string; icon?: { name?: string; style?: string; filled?: boolean }; controls?: AdminRoom['controls']; climate?: AdminRoom['climate']; vacuum?: AdminRoom['vacuum']; background?: AdminRoom['background'] };
@@ -49,7 +49,7 @@ export class DashboardApiService {
   constructor(private readonly http: HttpClient) {}
 
   async unlock(pin: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<{ token: string }>(`${this.baseUrl}/admin/unlock`, { pin }));
+    const response = await firstValueFrom(this.http.post<{ token: string }>(`${this.baseUrl}/admin/unlock`, { pin }).pipe(timeout(15000)));
     this.adminToken = response.token;
   }
 

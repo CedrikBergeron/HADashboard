@@ -209,11 +209,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
   }
   get cameraMenuItems(): CameraMenuItem[] {
     const configured = new Map(this.dashboardSettings.security.cameras.filter((camera) => /^camera\.[a-zA-Z0-9_]+$/.test(camera.entityId)).map((camera) => [camera.entityId, camera]));
-    const streamEntities = new Set(this.dashboardSettings.security.cameras.flatMap((camera) => [camera.previewEntityId, camera.fullscreenEntityId]).filter(Boolean));
     const names = new Map([...configured].map(([id, camera]) => [id, camera.name || id]));
-    for (const entity of this.adminEntityOptions) {
-      if (entity.entityId.startsWith('camera.') && !names.has(entity.entityId) && !streamEntities.has(entity.entityId)) names.set(entity.entityId, entity.name);
-    }
     const available = (id: string) => !['unavailable', 'unknown', 'off'].includes(this.latestEntities[id]?.state || '');
     return [...names].map(([entityId, name]) => {
       const camera = configured.get(entityId);
@@ -416,7 +412,7 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       this.adminPanelOpen = true;
       this.refreshAdminSession();
     } catch (error: any) {
-      this.adminPinError = error?.error?.error || (error?.status === 0 ? 'Serveur indisponible' : 'Impossible de vérifier le NIP');
+      this.adminPinError = error?.name === 'TimeoutError' ? 'La vérification a expiré. Réessayez.' : error?.error?.error || (error?.status === 0 ? 'Serveur indisponible' : 'Impossible de vérifier le NIP');
     } finally {
       this.adminUnlocking = false;
     }

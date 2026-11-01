@@ -29,7 +29,7 @@ describe('Home Assistant entity choices', () => {
 
 
 describe('Camera menu discovery', () => {
-  it('merges configured and discovered cameras once and flags unavailable streams', () => {
+  it('shows only configured cameras even when other cameras are discovered', () => {
     const component = new HomeDashboardComponent({} as HassService, {
       deviceStorageSuffix: '', cameraStreamUrl: (id: string) => `/camera/${id}/stream`
     } as DashboardApiService);
@@ -43,10 +43,12 @@ describe('Camera menu discovery', () => {
       'camera.garden': { entity_id: 'camera.garden', state: 'unavailable', attributes: {} },
       'camera.state_only': { entity_id: 'camera.state_only', state: 'idle', attributes: { friendly_name: 'Terrasse' } }
     };
-    expect(component.cameraMenuItems.length).toBe(3);
+    expect(component.cameraMenuItems.length).toBe(1);
     expect(component.cameraMenuItems.find((camera) => camera.entityId === 'camera.front')?.name).toBe('Entrée principale');
-    expect(component.cameraMenuItems.find((camera) => camera.entityId === 'camera.garden')?.available).toBeFalse();
-    expect(component.cameraMenuItems.find((camera) => camera.entityId === 'camera.state_only')?.streamUrl).toBe('/camera/camera.state_only/stream');
+    expect(component.cameraMenuItems.some((camera) => camera.entityId === 'camera.garden')).toBeFalse();
+    expect(component.cameraMenuItems.some((camera) => camera.entityId === 'camera.state_only')).toBeFalse();
+    component.dashboardSettings.security.cameras = [];
+    expect(component.cameraMenuItems).toEqual([]);
   });
 });
 
@@ -58,11 +60,28 @@ describe('Camera stream choices', () => {
     const state = component as unknown as { latestEntityRegistry: HassEntityRegistryEntry[]; latestEntities: Record<string, HassEntityState> };
     state.latestEntityRegistry = [{ entity_id: 'camera.front' }, { entity_id: 'camera.front_low' }, { entity_id: 'camera.front_high' }, { entity_id: 'camera.other' }];
     state.latestEntities = { 'camera.front_low': { entity_id: 'camera.front_low', state: 'unavailable', attributes: {} }, 'camera.front_high': { entity_id: 'camera.front_high', state: 'idle', attributes: {} } };
-    expect(component.cameraMenuItems.length).toBe(2);
+    expect(component.cameraMenuItems.length).toBe(1);
     const camera = component.cameraMenuItems.find((entry) => entry.entityId === 'camera.front')!;
     expect(camera.streamUrl).toBe('/stream/camera.front_low');
     expect(camera.fullscreenStreamUrl).toBe('/stream/camera.front_high');
     expect(camera.available).toBeFalse();
     expect(camera.fullscreenAvailable).toBeTrue();
+  });
+});
+
+
+describe('Administrator PIN verification errors', () => {
+  it('stops the spinner and allows another attempt after a timeout', async () => {
+    const unlock = jasmine.createSpy('unlock').and.rejectWith({ name: 'TimeoutError' });
+    const component = new HomeDashboardComponent({} as HassService, { deviceStorageSuffix: '', unlock } as unknown as DashboardApiService);
+    component.adminUnlockOpen = true;
+    component.adminPinValue = '1234';
+    await component.unlockAdmin();
+    expect(component.adminUnlocking).toBeFalse();
+    expect(component.adminPanelOpen).toBeFalse();
+    expect(component.adminUnlockOpen).toBeTrue();
+    expect(component.adminPinError).toContain('expiré');
+    await component.unlockAdmin();
+    expect(unlock).toHaveBeenCalledTimes(2);
   });
 });

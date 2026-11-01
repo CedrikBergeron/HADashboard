@@ -143,7 +143,7 @@ describe('Room photo picker', () => {
   it('displays an empty state when no cameras are detected', () => {
     const { fixture, root } = createPicker();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
-    expect(root.querySelector('.camera-menu-empty')?.textContent).toContain('Aucune caméra disponible.');
+    expect(root.querySelector('.camera-menu-empty')?.textContent).toContain('Aucune caméra configurée.');
     root.querySelector<HTMLButtonElement>('#camera-picker .room-picker-close')!.click(); fixture.detectChanges();
     expect(root.querySelector('#camera-picker')!.matches(':popover-open')).toBeFalse();
     fixture.destroy();
@@ -202,6 +202,51 @@ describe('Room photo picker', () => {
     await closed; fixture.detectChanges();
     expect(fullscreen.open).toBeFalse();
     expect(component.cameraMenuOpen).toBeTrue();
+    component.closeCameraMenu(); fixture.destroy();
+  });
+
+  it('releases all camera images before requesting admin access and prevents reopening during PIN validation', () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', [{ entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true }]); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(1);
+    const streamImage = root.querySelector<HTMLImageElement>('.camera-visual img')!;
+    let requested = false;
+    component.clockLongPress.subscribe(() => { requested = true; expect(component.cameraMenuOpen).toBeFalse(); });
+    root.querySelector('.temperature')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); fixture.detectChanges();
+    expect(requested).toBeTrue();
+    expect(streamImage.hasAttribute('src')).toBeFalse();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    fixture.componentRef.setInput('mediaSuspended', true); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    expect(component.cameraMenuOpen).toBeFalse();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    fixture.destroy();
+  });
+
+  it('closes fullscreen for administration without reopening preview streams', async () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', [{ entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true }]); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
+    const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
+    const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));
+    fixture.componentRef.setInput('mediaSuspended', true); fixture.detectChanges();
+    await closed; fixture.detectChanges();
+    expect(component.cameraMenuOpen).toBeFalse();
+    expect(component.fullscreenCamera).toBeNull();
+    expect(root.querySelectorAll('.camera-visual img, .camera-fullscreen-stream').length).toBe(0);
+    fixture.destroy();
+  });
+
+  it('explicitly cancels the sources of stream images removed by a page change', () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.page_${index}`, name: `Caméra ${index}`, streamUrl: `/test-camera/${index}`, available: true }))); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    const previousImages = Array.from(root.querySelectorAll<HTMLImageElement>('.camera-visual img'));
+    component.changeCameraPage(1); fixture.detectChanges();
+    expect(previousImages.every((image) => !image.hasAttribute('src'))).toBeTrue();
+    expect(root.querySelectorAll('.camera-visual img').length).toBeGreaterThan(0);
     component.closeCameraMenu(); fixture.destroy();
   });
 

@@ -8,7 +8,7 @@
       (pointerup)="cancelClockLongPress()"
       (pointercancel)="cancelClockLongPress()"
       (pointerleave)="cancelClockLongPress()"
-      (keydown.enter)="clockLongPress.emit()"
+      (keydown.enter)="requestAdminAccess()"
       (contextmenu)="$event.preventDefault()"
       aria-label="Heure actuelle">{{ time }}</button>
 
@@ -101,7 +101,7 @@
     </header>
     <div class="camera-grid">
         @for (camera of pagedCameras; track camera.entityId) {
-          <article class="camera-tile" [attr.aria-label]="camera.name">
+          <article class="camera-tile" [attr.aria-label]="camera.name" [attr.data-camera-id]="camera.entityId">
             <div class="camera-visual">
               @if (cameraMenuOpen) {
               @if (camera.available && !failedCameraStreams.has(camera.entityId)) {
@@ -120,7 +120,7 @@
             <div class="camera-tile-caption"><span class="material-symbols-outlined" aria-hidden="true">videocam</span><span>{{ camera.name }}</span></div>
           </article>
         } @empty {
-          <div class="camera-menu-empty"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><p>Aucune caméra disponible.</p><small>Les caméras Home Assistant apparaîtront ici automatiquement.</small></div>
+          <div class="camera-menu-empty"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><p>Aucune caméra configurée.</p><small>Ajoutez vos caméras dans l’administration, section Sécurité vidéo.</small></div>
         }
     </div>
     @if (cameraPageCount > 1) {
