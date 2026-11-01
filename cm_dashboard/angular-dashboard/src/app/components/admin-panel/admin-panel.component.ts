@@ -431,7 +431,12 @@ export class AdminPanelComponent implements OnChanges, OnInit {
     while (this.draftRooms.some((room) => room.id === id)) {
       id = `${base}-${suffix++}`;
     }
-    this.draftRooms = [...this.draftRooms, { id, name: 'Nouvelle pièce', floor: 'main', icon: 'meeting_room', iconStyle: 'outlined', iconFilled: false, controls: [], climate: { enabled: false, entityId: '' }, vacuum: { enabled: false, entityId: '', roomParameter: '' } }];
+    let floor = this.draftFloors.find((entry) => entry.id === this.selectedRoom?.floor) ?? this.draftFloors[0];
+    if (!floor) {
+      floor = { id: 'main', name: 'Étage principal', icon: 'home' };
+      this.draftFloors = [floor];
+    }
+    this.draftRooms = [...this.draftRooms, { id, name: 'Nouvelle pièce', floor: floor.id, icon: 'meeting_room', iconStyle: 'outlined', iconFilled: false, controls: [], climate: { enabled: false, entityId: '' }, vacuum: { enabled: false, entityId: '', roomParameter: '' } }];
     this.selectedRoomId = id;
     this.saveState = 'idle';
   }

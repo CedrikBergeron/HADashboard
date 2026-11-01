@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import { AdminPanelComponent, AdminRoom } from './admin-panel.component';
 import { DashboardApiService } from '../../service/dashboard-api.service';
 
@@ -67,5 +68,61 @@ describe('Room configuration and Home Assistant areas', () => {
     const document = api.configurationDocument(saved, component.draftFloors, component.draftSettings, { floorId: 'main', roomId: 'custom' });
     expect(document.rooms[0].areaId).toBe('kitchen');
     expect(document.rooms[0].controls?.[0].entityId).toBe('light.other');
+  });
+});
+
+
+describe('Adding rooms to the sidebar', () => {
+  let component: AdminPanelComponent;
+  beforeEach(() => {
+    component = new AdminPanelComponent({} as DashboardApiService);
+    component.draftFloors = [
+      { id: 'ground', name: 'Rez-de-chaussée', icon: 'home' },
+      { id: 'upper', name: 'Étage', icon: 'stairs' }
+    ];
+    component.draftRooms = [{ id: 'bedroom', name: 'Chambre', floor: 'upper', icon: 'bed', iconStyle: 'outlined', iconFilled: false }];
+    component.selectedRoomId = 'bedroom';
+  });
+  it('adds the room to the selected floor even when main does not exist', () => {
+    component.addRoom();
+    expect(component.selectedRoom?.floor).toBe('upper');
+    expect(component.floorGroups[1].rooms.map((room) => room.id)).toContain(component.selectedRoomId);
+  });
+  it('falls back to the first available floor when the selection is missing or its floor was removed', () => {
+    component.selectedRoomId = '';
+    component.addRoom();
+    expect(component.selectedRoom?.floor).toBe('ground');
+    component.selectedRoom!.floor = 'deleted';
+    component.addRoom();
+    expect(component.selectedRoom?.floor).toBe('ground');
+  });
+  it('creates a valid floor when none remain and keeps repeated additions visible with unique IDs', () => {
+    component.draftFloors = [];
+    component.draftRooms = [];
+    component.addRoom();
+    component.addRoom();
+    expect(component.draftFloors.length).toBe(1);
+    expect(component.floorGroups[0].rooms.length).toBe(2);
+    expect(new Set(component.draftRooms.map((room) => room.id)).size).toBe(2);
+  });
+  it('renders the new selected room in the sidebar after clicking Add room', () => {
+    TestBed.configureTestingModule({
+      imports: [AdminPanelComponent],
+      providers: [{ provide: DashboardApiService, useValue: {
+        getDevices: () => Promise.resolve([]), getConfigurations: () => Promise.resolve([])
+      } }]
+    });
+    const fixture = TestBed.createComponent(AdminPanelComponent);
+    fixture.componentRef.setInput('rooms', [{ label: 'Chambre', value: 'bedroom', floor: 'upper', icon: 'bed' }]);
+    fixture.componentRef.setInput('floors', component.draftFloors);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    element.querySelector<HTMLButtonElement>('.heading-actions .primary-button')!.click();
+    fixture.detectChanges();
+    const rows = element.querySelectorAll('.room-list-card .room-row');
+    expect(rows.length).toBe(2);
+    expect(element.querySelector('.room-list-card .room-row.selected')?.textContent).toContain('Nouvelle pièce');
+    expect(fixture.componentInstance.selectedRoom?.floor).toBe('upper');
+    fixture.destroy();
   });
 });
