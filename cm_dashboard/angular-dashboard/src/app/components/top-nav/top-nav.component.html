@@ -1,4 +1,4 @@
-<header class="topbar" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
+<header #topBar class="topbar" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
   <nav class="nav" aria-label="Navigation principale">
     <button
       type="button"
@@ -13,8 +13,8 @@
       aria-label="Heure actuelle">{{ time }}</button>
 
     <div class="menu-wrapper" [class.is-floor-leaving]="floorMenuTransition === 'leaving'" [class.is-floor-entering]="floorMenuTransition === 'entering'">
-      <button type="button" class="room-trigger" [disabled]="floorChangePending || !visibleItems.length"
-        aria-haspopup="dialog" aria-controls="room-picker" [attr.aria-expanded]="roomMenuOpen" (click)="openRoomMenu()">
+      <button #roomTrigger type="button" class="room-trigger" [class.is-open]="roomMenuOpen" [disabled]="floorChangePending || !visibleItems.length"
+        aria-haspopup="dialog" aria-controls="room-picker" popovertarget="room-picker" popovertargetaction="toggle" [attr.aria-expanded]="roomMenuOpen">
         <span class="material-symbols-outlined" aria-hidden="true">{{ selectedItem?.icon || 'meeting_room' }}</span>
         <span class="room-trigger-label">{{ selectedItem?.label || 'Choisir une pièce' }}</span>
         <span class="material-symbols-outlined room-trigger-arrow" aria-hidden="true">expand_more</span>
@@ -44,6 +44,11 @@
           </button>
         }
       </span>
+      <button #cameraTrigger type="button" class="camera-chip" [class.active]="cameraMenuOpen"
+        popovertarget="camera-picker" popovertargetaction="toggle" aria-haspopup="dialog" aria-controls="camera-picker"
+        [attr.aria-expanded]="cameraMenuOpen" aria-label="Voir les caméras de sécurité">
+        <span class="material-symbols-outlined" aria-hidden="true">videocam</span>
+      </button>
       @if (securityAvailable) {
         <button type="button" class="security-chip" [class.active]="securityActive" (click)="securityClick.emit()" aria-label="Ouvrir le centre de sécurité"><span class="material-symbols-outlined">shield</span></button>
       }
@@ -57,8 +62,8 @@
 </header>
 
 
-<dialog #roomDialog id="room-picker" class="room-picker" aria-labelledby="room-picker-title" aria-describedby="room-picker-floor"
-  (click)="onRoomBackdropClick($event)" (cancel)="cancelRoomMenu($event)" (close)="roomMenuOpen = false">
+<div #roomDialog id="room-picker" class="room-picker" popover="auto" role="dialog" [style.--room-menu-top]="roomMenuTop + 'px'" aria-labelledby="room-picker-title" aria-describedby="room-picker-floor"
+  (beforetoggle)="onRoomMenuToggle($event)" (toggle)="onRoomMenuAfterToggle()">
   <section class="room-picker-panel">
     <header class="room-picker-header">
       <div><p id="room-picker-floor">{{ currentFloorLabel }}</p><h2 id="room-picker-title">Choisir une pièce</h2></div>
@@ -82,4 +87,56 @@
         } @empty { <p class="room-picker-empty">Aucune pièce sur cet étage.</p> }
     </div>
   </section>
+</div>
+
+
+<div #cameraDialog id="camera-picker" class="room-picker camera-picker" popover="auto" role="dialog"
+  [style.--room-menu-top]="roomMenuTop + 'px'" aria-labelledby="camera-picker-title" (beforetoggle)="onCameraMenuToggle($event)">
+  <section class="room-picker-panel">
+    <header class="room-picker-header">
+      <div><p>Toutes les caméras</p><h2 id="camera-picker-title">Caméras de sécurité</h2></div>
+      <button type="button" class="room-picker-close" (click)="closeCameraMenu()" aria-label="Fermer le menu des caméras">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </header>
+    <div class="camera-grid">
+        @for (camera of pagedCameras; track camera.entityId) {
+          <article class="camera-tile" [attr.aria-label]="camera.name">
+            <div class="camera-visual">
+              @if (cameraMenuOpen) {
+              @if (camera.available && !failedCameraStreams.has(camera.entityId)) {
+                <img [src]="camera.streamUrl + '?session=' + (cameraRetryNonce[camera.entityId] || 0)" [alt]="camera.name"
+                  (error)="failedCameraStreams.add(camera.entityId)">
+                <span class="camera-live"><i></i>Direct</span>
+              } @else {
+                <div class="camera-stream-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span>
+                  <span>{{ camera.available ? 'Flux indisponible' : 'Caméra hors ligne' }}</span>
+                  @if (camera.available) { <button type="button" (click)="retryCamera(camera.entityId)">Réessayer</button> }
+                </div>
+              }
+              }
+            </div>
+            <button type="button" class="camera-expand" [attr.data-camera-id]="camera.entityId" [attr.aria-label]="'Agrandir ' + camera.name" (click)="openCameraFullscreen(camera)"><span class="material-symbols-outlined" aria-hidden="true">open_in_full</span></button>
+            <div class="camera-tile-caption"><span class="material-symbols-outlined" aria-hidden="true">videocam</span><span>{{ camera.name }}</span></div>
+          </article>
+        } @empty {
+          <div class="camera-menu-empty"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><p>Aucune caméra disponible.</p><small>Les caméras Home Assistant apparaîtront ici automatiquement.</small></div>
+        }
+    </div>
+    @if (cameraPageCount > 1) {
+      <footer class="camera-pagination"><button type="button" [disabled]="cameraPage === 0" (click)="changeCameraPage(-1)" aria-label="Caméras précédentes"><span class="material-symbols-outlined">chevron_left</span></button><span>{{ cameraPage + 1 }} / {{ cameraPageCount }}</span><button type="button" [disabled]="cameraPage === cameraPageCount - 1" (click)="changeCameraPage(1)" aria-label="Caméras suivantes"><span class="material-symbols-outlined">chevron_right</span></button></footer>
+    }
+  </section>
+</div>
+
+
+<dialog #cameraFullscreen class="camera-fullscreen" aria-labelledby="camera-fullscreen-title" (cancel)="cancelCameraFullscreen($event)" (close)="onCameraFullscreenClosed()">
+  <header class="camera-fullscreen-toolbar"><div><span>Direct</span><h2 id="camera-fullscreen-title">{{ fullscreenCamera?.name }}</h2></div><button type="button" class="camera-fullscreen-close" (click)="closeCameraFullscreen()" aria-label="Retour aux caméras" autofocus><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
+  @if (fullscreenCamera; as camera) {
+    @if ((camera.fullscreenAvailable ?? camera.available) && !fullscreenStreamFailed) {
+      <img class="camera-fullscreen-stream" [src]="(camera.fullscreenStreamUrl || camera.streamUrl) + '?session=' + fullscreenRetryNonce" [alt]="camera.name" (error)="fullscreenStreamFailed = true">
+    } @else {
+      <div class="camera-stream-error fullscreen-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><span>{{ (camera.fullscreenAvailable ?? camera.available) ? 'Flux indisponible' : 'Caméra hors ligne' }}</span>@if (camera.fullscreenAvailable ?? camera.available) { <button type="button" (click)="retryFullscreenStream()">Réessayer</button> }</div>
+    }
+  }
 </dialog>

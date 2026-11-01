@@ -173,3 +173,13 @@ input:focus, select:focus { border-color: rgba(255,255,255,.32); }
 .entity-picker.room-scoped { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
 .floor-manager { grid-template-rows: auto auto minmax(0, 1fr) auto; }
 .hass-floor-suggestions { max-height: 120px; overflow: auto; }
+
+.camera-stream-choices { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; min-width: 0; }
+.camera-stream-hint { grid-column: 1 / -1; color: rgba(255,255,255,.42); font-size: .67rem; line-height: 1.5; }
+@media (max-width: 560px) { .camera-stream-choices { grid-template-columns: 1fr; } }
+
+.camera-config-smart { grid-template-columns: minmax(0,1fr) 110px 34px 30px; }
+.camera-config-smart .camera-source-pair { grid-column: 1 / -1; }
+@media (max-width: 600px) { .camera-config-smart { grid-template-columns: 1fr 1fr 34px 30px; } }
+
+@media (max-width: 600px) { .camera-config-smart > select { grid-column: 1 / 3; } }

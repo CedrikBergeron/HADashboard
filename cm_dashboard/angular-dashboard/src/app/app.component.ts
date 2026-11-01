@@ -2,7 +2,7 @@ import { AsyncPipe } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { combineLatest, Subscription } from 'rxjs';
-import { TopNavActionChip, TopNavComponent } from './components/top-nav/top-nav.component';
+import { CameraMenuItem, TopNavActionChip, TopNavComponent } from './components/top-nav/top-nav.component';
 import {
   BottomControlBarComponent,
   BottomControlItem
@@ -207,6 +207,25 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
     }
     return ids;
   }
+  get cameraMenuItems(): CameraMenuItem[] {
+    const configured = new Map(this.dashboardSettings.security.cameras.filter((camera) => /^camera\.[a-zA-Z0-9_]+$/.test(camera.entityId)).map((camera) => [camera.entityId, camera]));
+    const streamEntities = new Set(this.dashboardSettings.security.cameras.flatMap((camera) => [camera.previewEntityId, camera.fullscreenEntityId]).filter(Boolean));
+    const names = new Map([...configured].map(([id, camera]) => [id, camera.name || id]));
+    for (const entity of this.adminEntityOptions) {
+      if (entity.entityId.startsWith('camera.') && !names.has(entity.entityId) && !streamEntities.has(entity.entityId)) names.set(entity.entityId, entity.name);
+    }
+    const available = (id: string) => !['unavailable', 'unknown', 'off'].includes(this.latestEntities[id]?.state || '');
+    return [...names].map(([entityId, name]) => {
+      const camera = configured.get(entityId);
+      const previewId = camera?.previewEntityId || entityId;
+      const fullscreenId = camera?.fullscreenEntityId || entityId;
+      return {
+        entityId, name, streamUrl: this.dashboardApi.cameraStreamUrl(previewId), available: available(previewId),
+        fullscreenStreamUrl: this.dashboardApi.cameraStreamUrl(fullscreenId), fullscreenAvailable: available(fullscreenId)
+      };
+    });
+  }
+
   get visibleSecurityCameras(): SecurityCamera[] { const cameras = this.dashboardSettings.security.cameras.filter((camera) => camera.entityId); return this.securityZone === 'all' ? cameras : cameras.filter((camera) => camera.zone === this.securityZone); }
   get activeSecurityCamera(): SecurityCamera | undefined { return this.visibleSecurityCameras[Math.min(this.selectedSecurityCamera, Math.max(0, this.visibleSecurityCameras.length - 1))]; }
   get visibleSecurityAccessPoints(): SecurityAccessPoint[] { const points = this.dashboardSettings.security.accessPoints || []; return this.securityZone === 'all' ? points : points.filter((point) => point.zone === this.securityZone); }

@@ -126,3 +126,76 @@ describe('Adding rooms to the sidebar', () => {
     fixture.destroy();
   });
 });
+
+
+describe('Camera stream configuration', () => {
+  it('selects independent camera sources and retains both across a save and reload', async () => {
+    const component = new AdminPanelComponent({} as DashboardApiService);
+    component.draftSettings.security.cameras = [{ entityId: 'camera.main', name: 'Entrée', zone: 'entrance', motionEntityId: 'binary_sensor.motion', motionPopupEnabled: true }];
+    component.entities = [
+      { entityId: 'camera.low', name: 'Basse résolution', state: 'idle' },
+      { entityId: 'camera.high', name: 'Haute résolution', state: 'idle' },
+      { entityId: 'light.test', name: 'Lampe', state: 'on' }
+    ];
+    component.openEntityPicker('cameraPreview', 0);
+    expect(component.visibleEntities.length).toBe(2);
+    component.selectPresenceEntity('camera.low');
+    component.openEntityPicker('cameraFullscreen', 0);
+    component.selectPresenceEntity('camera.high');
+    let settings = component.draftSettings;
+    component.save.subscribe((payload) => settings = payload.settings);
+    component.saveChanges();
+    const api = new DashboardApiService({} as never);
+    const document = api.configurationDocument([], [], settings, { floorId: 'main', roomId: '' });
+    spyOn(api, 'readConfiguration').and.resolveTo({ name: 'Test', dashboard: document });
+    const reloaded = await api.getHome();
+    expect(reloaded.settings.security.cameras[0].previewEntityId).toBe('camera.low');
+    expect(reloaded.settings.security.cameras[0].fullscreenEntityId).toBe('camera.high');
+    expect(reloaded.settings.security.cameras[0].motionEntityId).toBe('binary_sensor.motion');
+    component.openEntityPicker('cameraPreview', 0); component.selectPresenceEntity('');
+    expect(component.draftSettings.security.cameras[0].previewEntityId).toBe('');
+    expect(component.draftSettings.security.cameras[0].fullscreenEntityId).toBe('camera.high');
+  });
+
+  it('keeps legacy camera configurations usable without stream overrides', async () => {
+    const component = new AdminPanelComponent({} as DashboardApiService);
+    component.addSecurityCamera();
+    component.draftSettings.security.cameras[0].entityId = 'camera.legacy';
+    const api = new DashboardApiService({} as never);
+    const document = api.configurationDocument([], [], component.draftSettings, { floorId: 'main', roomId: '' });
+    spyOn(api, 'readConfiguration').and.resolveTo({ name: 'Legacy', dashboard: document });
+    const reloaded = await api.getHome();
+    expect(reloaded.settings.security.cameras[0].entityId).toBe('camera.legacy');
+    expect(reloaded.settings.security.cameras[0].previewEntityId).toBe('');
+    expect(reloaded.settings.security.cameras[0].fullscreenEntityId).toBe('');
+  });
+});
+
+
+describe('Camera stream controls in the administration', () => {
+  it('selects both streams through the rendered controls and saves them', () => {
+    TestBed.configureTestingModule({ imports: [AdminPanelComponent], providers: [{ provide: DashboardApiService, useValue: { getDevices: () => Promise.resolve([]), getConfigurations: () => Promise.resolve([]) } }] });
+    const fixture = TestBed.createComponent(AdminPanelComponent);
+    const component = fixture.componentInstance;
+    component.activeSection = 'video';
+    component.draftSettings.security.cameras = [{ entityId: 'camera.main', name: 'Entrée', zone: 'entrance', motionEntityId: '', motionPopupEnabled: false }];
+    fixture.componentRef.setInput('entities', [{ entityId: 'camera.low', name: 'Basse résolution', state: 'idle' }, { entityId: 'camera.high', name: 'Haute résolution', state: 'idle' }]);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const streamButtons = root.querySelectorAll<HTMLButtonElement>('.camera-stream-choices .camera-entity');
+    expect(streamButtons.length).toBe(2);
+    expect(streamButtons[0].textContent).toContain('Flux du menu');
+    streamButtons[0].click(); fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.entity-picker .entity-result')).find((button) => button.textContent?.includes('camera.low'))!.click(); fixture.detectChanges();
+    streamButtons[1].click(); fixture.detectChanges();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('.entity-picker .entity-result')).find((button) => button.textContent?.includes('camera.high'))!.click(); fixture.detectChanges();
+    const save = spyOn(component.save, 'emit');
+    root.querySelector<HTMLButtonElement>('.admin-footer .primary-button')!.click();
+    expect(save).toHaveBeenCalled();
+    const camera = save.calls.mostRecent().args[0]!.settings.security.cameras[0];
+    expect(camera.previewEntityId).toBe('camera.low');
+    expect(camera.fullscreenEntityId).toBe('camera.high');
+    expect(camera.entityId).toBe('camera.main');
+    fixture.destroy();
+  });
+});

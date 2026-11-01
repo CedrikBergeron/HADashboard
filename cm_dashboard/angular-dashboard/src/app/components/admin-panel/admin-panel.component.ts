@@ -72,7 +72,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   pinSaving = false;
   entityPickerOpen = false;
   entityQuery = '';
-  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' | 'securityCamera' | 'cameraMotion' | 'accessLock' | 'accessContact' | 'doorbell' | 'doorbellCamera' | 'doorLock' | 'entryLight' = 'presence';
+  entityPickerMode: 'presence' | 'control' | 'climate' | 'vacuum' | 'securityCamera' | 'cameraPreview' | 'cameraFullscreen' | 'cameraMotion' | 'accessLock' | 'accessContact' | 'doorbell' | 'doorbellCamera' | 'doorLock' | 'entryLight' = 'presence';
   entityPickerControlIndex = -1;
   iconPickerControlIndex = -1;
   backgroundUploading = false;
@@ -343,7 +343,7 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   get visibleEntities(): AdminEntityOption[] {
     const query = this.normalizeSearch(this.entityQuery);
     const domain = (id: string) => id.split('.')[0];
-    const allowed = ['securityCamera','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : ['doorLock','accessLock'].includes(this.entityPickerMode) ? ['lock'] : this.entityPickerMode === 'accessContact' ? ['binary_sensor'] : this.entityPickerMode === 'cameraMotion' ? ['binary_sensor','event','sensor'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
+    const allowed = ['securityCamera','cameraPreview','cameraFullscreen','doorbellCamera'].includes(this.entityPickerMode) ? ['camera'] : ['doorLock','accessLock'].includes(this.entityPickerMode) ? ['lock'] : this.entityPickerMode === 'accessContact' ? ['binary_sensor'] : this.entityPickerMode === 'cameraMotion' ? ['binary_sensor','event','sensor'] : this.entityPickerMode === 'doorbell' ? ['event','binary_sensor','sensor'] : this.entityPickerMode === 'entryLight' ? ['light','switch'] : this.entityPickerMode === 'climate' ? ['climate'] : this.entityPickerMode === 'vacuum' ? ['vacuum'] : this.entityPickerMode === 'presence' ? ['input_boolean','binary_sensor','sensor','person','device_tracker'] : null;
     const areaId = this.selectedRoomArea?.area_id;
     const source = this.isRoomEntityPicker && this.onlyRoomEntities && areaId ? this.entities.filter((entity) => entity.areaId === areaId) : this.entities;
     const scoped = allowed ? source.filter((entity) => allowed.includes(domain(entity.entityId))) : source;
@@ -411,6 +411,8 @@ export class AdminPanelComponent implements OnChanges, OnInit {
 
   isEntitySelected(entityId: string): boolean {
     if (this.entityPickerMode === 'securityCamera') return this.draftSettings.security.cameras[this.entityPickerControlIndex]?.entityId === entityId;
+    if (this.entityPickerMode === 'cameraPreview') return (this.draftSettings.security.cameras[this.entityPickerControlIndex]?.previewEntityId || '') === entityId;
+    if (this.entityPickerMode === 'cameraFullscreen') return (this.draftSettings.security.cameras[this.entityPickerControlIndex]?.fullscreenEntityId || '') === entityId;
     if (this.entityPickerMode === 'cameraMotion') return this.draftSettings.security.cameras[this.entityPickerControlIndex]?.motionEntityId === entityId;
     if (this.entityPickerMode === 'accessLock') return this.draftSettings.security.accessPoints[this.entityPickerControlIndex]?.lockEntityId === entityId;
     if (this.entityPickerMode === 'accessContact') return this.draftSettings.security.accessPoints[this.entityPickerControlIndex]?.contactEntityId === entityId;
@@ -588,6 +590,8 @@ export class AdminPanelComponent implements OnChanges, OnInit {
   selectPresenceEntity(entityId: string): void {
     const room = this.selectedRoom;
     if (this.entityPickerMode === 'securityCamera' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].entityId = entityId;
+    else if (this.entityPickerMode === 'cameraPreview' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].previewEntityId = entityId;
+    else if (this.entityPickerMode === 'cameraFullscreen' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].fullscreenEntityId = entityId;
     else if (this.entityPickerMode === 'cameraMotion' && this.draftSettings.security.cameras[this.entityPickerControlIndex]) this.draftSettings.security.cameras[this.entityPickerControlIndex].motionEntityId = entityId;
     else if (this.entityPickerMode === 'accessLock' && this.draftSettings.security.accessPoints[this.entityPickerControlIndex]) this.draftSettings.security.accessPoints[this.entityPickerControlIndex].lockEntityId = entityId;
     else if (this.entityPickerMode === 'accessContact' && this.draftSettings.security.accessPoints[this.entityPickerControlIndex]) this.draftSettings.security.accessPoints[this.entityPickerControlIndex].contactEntityId = entityId;

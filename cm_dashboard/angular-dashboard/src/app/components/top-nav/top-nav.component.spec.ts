@@ -14,7 +14,7 @@ describe('Room photo picker', () => {
     fixture.componentRef.setInput('roomBackgrounds', [{ roomValue: 'living', src: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E', positionX: 30, positionY: 70 }]);
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    return { fixture, root, component: fixture.componentInstance, dialog: root.querySelector('dialog')!, trigger: root.querySelector<HTMLButtonElement>('.room-trigger')! };
+    return { fixture, root, component: fixture.componentInstance, dialog: root.querySelector<HTMLElement>('[popover]')!, trigger: root.querySelector<HTMLButtonElement>('.room-trigger')! };
   }
 
   it('shows only the active room in the top bar and opens cards for the current floor', () => {
@@ -22,10 +22,11 @@ describe('Room photo picker', () => {
     expect(root.querySelector('.menu-wrapper')?.textContent).toContain('Salon');
     expect(root.querySelector('.menu-wrapper')?.textContent).not.toContain('Cuisine');
     trigger.click(); fixture.detectChanges();
-    expect(dialog.open).toBeTrue();
+    expect(dialog.matches(':popover-open')).toBeTrue();
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(root.querySelectorAll('.room-card').length).toBe(2);
     expect(root.querySelector('.room-card.is-selected')?.getAttribute('aria-current')).toBe('page');
+    component.onRoomMenuAfterToggle();
     expect(document.activeElement).toBe(root.querySelector('.room-card.is-selected'));
     const image = root.querySelector<HTMLImageElement>('.room-card-photo')!;
     expect(image.getAttribute('src')).toBe(component.roomBackgrounds[0].src);
@@ -34,13 +35,28 @@ describe('Room photo picker', () => {
     component.closeRoomMenu(); fixture.destroy();
   });
 
+  it('opens below the top bar, leaves its controls available, and toggles closed from the room button', () => {
+    const { fixture, root, dialog, trigger } = createPicker();
+    trigger.click(); fixture.detectChanges();
+    const bar = root.querySelector('.topbar')!;
+    expect(dialog.getBoundingClientRect().top).toBeGreaterThanOrEqual(bar.getBoundingClientRect().bottom);
+    expect(bar.closest('[inert]')).toBeNull();
+    expect(root.querySelector<HTMLButtonElement>('.floor-badge')!.disabled).toBeFalse();
+    expect(trigger.getAttribute('popovertarget')).toBe(dialog.id);
+    expect(trigger.getAttribute('popovertargetaction')).toBe('toggle');
+    trigger.click(); fixture.detectChanges();
+    expect(dialog.matches(':popover-open')).toBeFalse();
+    fixture.destroy();
+  });
+
   it('selects a room and closes the menu while preserving the existing navigation event', () => {
     const { fixture, root, component, dialog, trigger } = createPicker();
     const clicked = spyOn(component.itemClick, 'emit');
     trigger.focus(); trigger.click(); fixture.detectChanges();
+    component.onRoomMenuAfterToggle();
     root.querySelectorAll<HTMLButtonElement>('.room-card')[1].click(); fixture.detectChanges();
     expect(clicked).toHaveBeenCalledWith(component.items[1]);
-    expect(dialog.open).toBeFalse();
+    expect(dialog.matches(':popover-open')).toBeFalse();
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(trigger);
     fixture.destroy();
@@ -49,14 +65,14 @@ describe('Room photo picker', () => {
   it('closes through Escape, the close button and the backdrop', () => {
     const { fixture, root, component, dialog, trigger } = createPicker();
     trigger.click(); fixture.detectChanges();
-    dialog.dispatchEvent(new Event('cancel', { cancelable: true })); fixture.detectChanges();
-    expect(dialog.open).toBeFalse();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); fixture.detectChanges();
+    expect(dialog.matches(':popover-open')).toBeFalse();
     trigger.click(); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.room-picker-close')!.click();
     expect(component.roomMenuOpen).toBeFalse();
     trigger.click(); fixture.detectChanges();
-    dialog.click(); fixture.detectChanges();
-    expect(dialog.open).toBeFalse();
+    document.body.click(); fixture.detectChanges();
+    expect(dialog.matches(':popover-open')).toBeFalse();
     fixture.destroy();
   });
 
@@ -81,4 +97,112 @@ describe('Room photo picker', () => {
     expect(root.querySelector('.room-card-name')?.textContent).toContain('Chambre');
     component.closeRoomMenu(); fixture.destroy();
   }));
+  it('opens all camera feeds beside the vacuum and releases them when toggled closed', () => {
+    const { fixture, root, component, trigger } = createPicker();
+    fixture.componentRef.setInput('cameras', [
+      { entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true },
+      { entityId: 'camera.garden', name: 'Jardin', streamUrl: '/test-camera/garden', available: true },
+      { entityId: 'camera.offline', name: 'Garage', streamUrl: '/test-camera/garage', available: false }
+    ]);
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    trigger.click(); fixture.detectChanges();
+    const cameraButton = root.querySelector<HTMLButtonElement>('.camera-chip')!;
+    cameraButton.click(); fixture.detectChanges();
+    expect(component.cameraMenuOpen).toBeTrue();
+    expect(component.roomMenuOpen).toBeFalse();
+    expect(root.querySelectorAll('.camera-tile').length).toBe(3);
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(2);
+    expect(root.querySelector('.camera-stream-error')?.textContent).toContain('Caméra hors ligne');
+    cameraButton.click(); fixture.detectChanges();
+    expect(component.cameraMenuOpen).toBeFalse();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    fixture.destroy();
+  });
+
+  it('shows a failed stream independently and retries only that camera', () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', [
+      { entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true },
+      { entityId: 'camera.garden', name: 'Jardin', streamUrl: '/test-camera/garden', available: true }
+    ]);
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    root.querySelector('.camera-visual img')!.dispatchEvent(new Event('error')); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(1);
+    expect(root.querySelector('.camera-stream-error')?.textContent).toContain('Flux indisponible');
+    root.querySelector<HTMLButtonElement>('.camera-stream-error button')!.click(); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(2);
+    expect(root.querySelector('.camera-visual img')?.getAttribute('src')).toContain('session=1');
+    expect(component.cameraRetryNonce['camera.garden']).toBeUndefined();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    fixture.destroy();
+  });
+
+  it('displays an empty state when no cameras are detected', () => {
+    const { fixture, root } = createPicker();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    expect(root.querySelector('.camera-menu-empty')?.textContent).toContain('Aucune caméra disponible.');
+    root.querySelector<HTMLButtonElement>('#camera-picker .room-picker-close')!.click(); fixture.detectChanges();
+    expect(root.querySelector('#camera-picker')!.matches(':popover-open')).toBeFalse();
+    fixture.destroy();
+  });
+
+  it('paginates a large camera grid without scrolling or clipping names', () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.offline_${index}`, name: `Caméra ${index}`, streamUrl: '/unused', available: false })));
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    const grid = root.querySelector<HTMLElement>('.camera-grid')!;
+    const tile = root.querySelector('.camera-tile')!.getBoundingClientRect();
+    const caption = root.querySelector('.camera-tile-caption')!.getBoundingClientRect();
+    expect(caption.bottom).toBeLessThanOrEqual(tile.bottom);
+    expect(grid.scrollHeight).toBeLessThanOrEqual(grid.clientHeight + 1);
+    expect(root.querySelectorAll('.camera-tile').length).toBe(component.cameraPageSize);
+    component.changeCameraPage(1); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-tile').length).toBe(Math.min(component.cameraPageSize, 12 - component.cameraPageSize));
+    component.closeCameraMenu(); fixture.destroy();
+  });
+
+  it('opens a distinct fullscreen stream and returns to the same camera page', async () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.test_${index}`, name: `Caméra ${index}`, streamUrl: `/test/preview_${index}`, fullscreenStreamUrl: `/test/full_${index}`, available: false, fullscreenAvailable: true })));
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    component.changeCameraPage(1); fixture.detectChanges();
+    const id = component.pagedCameras[0].entityId;
+    root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
+    const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
+    expect(fullscreen.open).toBeTrue();
+    expect(root.querySelector('.camera-fullscreen-stream')?.getAttribute('src')).toContain(`/test/full_${component.cameraPageSize}`);
+    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(component.cameraMenuOpen).toBeFalse();
+    const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));
+    root.querySelector<HTMLButtonElement>('.camera-fullscreen-close')!.click();
+    await closed; fixture.detectChanges();
+    expect(component.fullscreenCamera).toBeNull();
+    expect(root.querySelector('.camera-fullscreen-stream')).toBeNull();
+    expect(component.cameraMenuOpen).toBeTrue();
+    expect(component.cameraPage).toBe(1);
+    expect((document.activeElement as HTMLElement).dataset['cameraId']).toBe(id);
+    component.closeCameraMenu(); fixture.destroy();
+  });
+
+  it('falls back to the primary stream and Escape returns from fullscreen to the grid', async () => {
+    const { fixture, root, component } = createPicker();
+    fixture.componentRef.setInput('cameras', [{ entityId: 'camera.legacy', name: 'Ancienne caméra', streamUrl: '/test/legacy', available: true }]);
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
+    expect(root.querySelector('.camera-fullscreen-stream')?.getAttribute('src')).toContain('/test/legacy');
+    const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
+    const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await closed; fixture.detectChanges();
+    expect(fullscreen.open).toBeFalse();
+    expect(component.cameraMenuOpen).toBeTrue();
+    component.closeCameraMenu(); fixture.destroy();
+  });
+
 });

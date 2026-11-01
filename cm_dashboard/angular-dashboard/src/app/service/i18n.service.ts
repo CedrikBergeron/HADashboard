@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 import type { DashboardLanguage } from './dashboard-api.service';
 
 const ENGLISH_PHRASES: Array<[string, string]> = [
+  ['Caméra principale', 'Primary camera'], ['Flux du menu', 'Menu stream'], ['Flux plein écran', 'Fullscreen stream'], ['Utiliser la caméra principale', 'Use primary camera'], ['Aucun flux personnalisé', 'No custom stream'], ['Retour aux caméras', 'Back to cameras'], ['Caméras précédentes', 'Previous cameras'], ['Caméras suivantes', 'Next cameras'],
+  ['Choisissez par exemple le flux basse résolution pour le menu et le flux haute résolution pour le plein écran. Sans sélection, la caméra principale est utilisée.', 'For example, choose the low-resolution stream for the menu and the high-resolution stream for fullscreen. The primary camera is used when no override is selected.'],
+  ['Voir les caméras de sécurité', 'View security cameras'], ['Fermer le menu des caméras', 'Close camera menu'], ['Toutes les caméras', 'All cameras'], ['Caméras de sécurité', 'Security cameras'],
+  ['Flux indisponible', 'Stream unavailable'], ['Caméra hors ligne', 'Camera offline'], ['Réessayer', 'Retry'], ['Direct', 'Live'], ['Aucune caméra disponible.', 'No cameras available.'], ['Les caméras Home Assistant apparaîtront ici automatiquement.', 'Home Assistant cameras will appear here automatically.'],
   ['Choisir une pièce', 'Choose a room'], ['Fermer le menu des pièces', 'Close room picker'], ['Aucune pièce sur cet étage.', 'No rooms on this floor.'],
   ['Pièce Home Assistant', 'Home Assistant room'], ['Sans area Home Assistant', 'No Home Assistant area'], ['Area indisponible', 'Area unavailable'],
   ['Choisissez une pièce proposée, puis personnalisez son nom et son étage librement.', 'Choose a suggested room, then customize its name and floor freely.'],
