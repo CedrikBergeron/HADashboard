@@ -459,7 +459,7 @@
 }
 .camera-grid { display: grid; align-content: start; grid-auto-rows: max-content; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 24px 24px; scrollbar-color: rgba(255,255,255,.2) transparent; scrollbar-width: thin; }
 .camera-tile { min-width: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: rgba(255,255,255,.025); box-shadow: inset 0 1px rgba(255,255,255,.04); }
-.camera-visual { position: relative; aspect-ratio: 16 / 9; background: #101214; overflow: hidden; img { display: block; width: 100%; height: 100%; object-fit: contain; } }
+.camera-visual { position: relative; aspect-ratio: 16 / 9; background: #101214; overflow: hidden; img { display: block; width: 100%; height: 100%; object-fit: cover; } }
 .camera-live { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(10,12,15,.55); backdrop-filter: blur(12px); color: rgba(255,255,255,.86); font-size: .6rem; font-weight: 550; i { width: 5px; height: 5px; background: #aac3b4; border-radius: 50%; } }
 .camera-tile-caption { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px; color: rgba(255,255,255,.85); font-size: .78rem; font-weight: 500; > .material-symbols-outlined { color: rgba(255,255,255,.4); font-size: 17px; } > span:last-child { min-width: 0; overflow-wrap: anywhere; padding: 10px 0; } }
 .camera-stream-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: rgba(255,255,255,.45); font-size: .76rem; > .material-symbols-outlined { font-size: 28px; } button { min-height: 36px; padding: 0 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; background: rgba(255,255,255,.05); color: rgba(255,255,255,.85); font: inherit; cursor: pointer; } }
@@ -491,3 +491,9 @@
 @media (prefers-reduced-motion: reduce) { .camera-fullscreen[open] { animation: none; } .camera-fullscreen-close { transition: none; } }
 :host-context(.reduced-motion) .camera-fullscreen[open] { animation: none; }
 :host-context(.reduced-motion) .camera-fullscreen-close { transition: none; }
+
+/* Fit nine 16:9 previews within the available wall, without stretching the video. */
+.camera-grid { container-type: size; align-items: center; justify-items: center; }
+.camera-tile { width: min(100%, calc((100cqh - 20px) * 16 / 27)); aspect-ratio: 16 / 9; box-sizing: border-box; }
+.camera-visual { position: absolute; inset: 0; height: 100%; }
+@media (max-width: 767px) { .camera-tile { width: min(100%, calc((100cqh - 10px) * 8 / 9)); } }

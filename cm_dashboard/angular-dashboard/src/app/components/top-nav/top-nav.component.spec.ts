@@ -158,6 +158,7 @@ describe('Room photo picker', () => {
     const tile = root.querySelector('.camera-tile')!.getBoundingClientRect();
     const caption = root.querySelector('.camera-tile-caption')!.getBoundingClientRect();
     expect(caption.bottom).toBeLessThanOrEqual(tile.bottom);
+    expect(tile.width / tile.height).toBeCloseTo(16 / 9, 1);
     expect(grid.scrollHeight).toBeLessThanOrEqual(grid.clientHeight + 1);
     expect(root.querySelectorAll('.camera-tile').length).toBe(component.cameraPageSize);
     component.changeCameraPage(1); fixture.detectChanges();
