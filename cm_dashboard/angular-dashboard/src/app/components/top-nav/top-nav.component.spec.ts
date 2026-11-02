@@ -1,9 +1,16 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { CameraPlaybackService } from '../../service/camera-playback.service';
 import { TopNavComponent } from './top-nav.component';
 
 describe('Room photo picker', () => {
   function createPicker() {
-    TestBed.configureTestingModule({ imports: [TopNavComponent] });
+    const playback = {
+      getStreamUrl: jasmine.createSpy('getStreamUrl').and.resolveTo('/test/master.m3u8'),
+      cleanup: jasmine.createSpy('cleanup'),
+      attach: jasmine.createSpy('attach')
+    };
+    playback.attach.and.callFake(async () => playback.cleanup);
+    TestBed.configureTestingModule({ imports: [TopNavComponent], providers: [{ provide: CameraPlaybackService, useValue: playback }] });
     const fixture = TestBed.createComponent(TopNavComponent);
     fixture.componentRef.setInput('floors', [{ id: 'ground', name: 'Rez-de-chaussée', icon: 'home' }, { id: 'upper', name: 'Étage', icon: 'stairs' }]);
     fixture.componentRef.setInput('items', [
@@ -14,7 +21,7 @@ describe('Room photo picker', () => {
     fixture.componentRef.setInput('roomBackgrounds', [{ roomValue: 'living', src: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E', positionX: 30, positionY: 70 }]);
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    return { fixture, root, component: fixture.componentInstance, dialog: root.querySelector<HTMLElement>('[popover]')!, trigger: root.querySelector<HTMLButtonElement>('.room-trigger')! };
+    return { fixture, root, playback, component: fixture.componentInstance, dialog: root.querySelector<HTMLElement>('[popover]')!, trigger: root.querySelector<HTMLButtonElement>('.room-trigger')! };
   }
 
   it('shows only the active room in the top bar and opens cards for the current floor', () => {
@@ -105,38 +112,41 @@ describe('Room photo picker', () => {
       { entityId: 'camera.offline', name: 'Garage', streamUrl: '/test-camera/garage', available: false }
     ]);
     fixture.detectChanges();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     trigger.click(); fixture.detectChanges();
     const cameraButton = root.querySelector<HTMLButtonElement>('.camera-chip')!;
     cameraButton.click(); fixture.detectChanges();
     expect(component.cameraMenuOpen).toBeTrue();
     expect(component.roomMenuOpen).toBeFalse();
     expect(root.querySelectorAll('.camera-tile').length).toBe(3);
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(2);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(2);
     expect(root.querySelector('.camera-stream-error')?.textContent).toContain('Caméra hors ligne');
     cameraButton.click(); fixture.detectChanges();
     expect(component.cameraMenuOpen).toBeFalse();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     fixture.destroy();
   });
 
-  it('shows a failed stream independently and retries only that camera', () => {
-    const { fixture, root, component } = createPicker();
+  it('shows a failed video independently and retries only that camera', async () => {
+    const { fixture, root, component, playback } = createPicker();
     fixture.componentRef.setInput('cameras', [
-      { entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true },
-      { entityId: 'camera.garden', name: 'Jardin', streamUrl: '/test-camera/garden', available: true }
+      { entityId: 'camera.front', name: 'Entrée', streamUrl: '/unused', available: true },
+      { entityId: 'camera.garden', name: 'Jardin', streamUrl: '/unused', available: true }
     ]);
     fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
-    root.querySelector('.camera-visual img')!.dispatchEvent(new Event('error')); fixture.detectChanges();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(1);
-    expect(root.querySelector('.camera-stream-error')?.textContent).toContain('Flux indisponible');
-    root.querySelector<HTMLButtonElement>('.camera-stream-error button')!.click(); fixture.detectChanges();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(2);
-    expect(root.querySelector('.camera-visual img')?.getAttribute('src')).toContain('session=1');
-    expect(component.cameraRetryNonce['camera.garden']).toBeUndefined();
+    await fixture.whenStable(); fixture.detectChanges();
+    root.querySelector('.camera-visual video')!.dispatchEvent(new Event('error')); fixture.detectChanges();
+    expect(root.querySelectorAll('.camera-video-error').length).toBe(1);
+    expect(root.querySelector('.camera-video-error')?.textContent).toContain('Flux vidéo indisponible');
+    const requests = playback.getStreamUrl.calls.count();
+    root.querySelector<HTMLButtonElement>('.camera-video-error button')!.click();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(playback.getStreamUrl.calls.count()).toBe(requests + 1);
+    expect(playback.getStreamUrl.calls.mostRecent().args[0]).toBe('camera.front');
+    expect(root.querySelectorAll('.camera-video-error').length).toBe(0);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); fixture.detectChanges();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     fixture.destroy();
   });
 
@@ -168,7 +178,7 @@ describe('Room photo picker', () => {
 
   it('opens a distinct fullscreen stream and returns to the same camera page', async () => {
     const { fixture, root, component } = createPicker();
-    fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.test_${index}`, name: `Caméra ${index}`, streamUrl: `/test/preview_${index}`, fullscreenStreamUrl: `/test/full_${index}`, available: false, fullscreenAvailable: true })));
+    fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.test_${index}`, name: `Caméra ${index}`, streamUrl: `/test/preview_${index}`, fullscreenEntityId: `camera.high_${index}`, available: false, fullscreenAvailable: true })));
     fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
     component.changeCameraPage(1); fixture.detectChanges();
@@ -176,8 +186,8 @@ describe('Room photo picker', () => {
     root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
     const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
     expect(fullscreen.open).toBeTrue();
-    expect(root.querySelector('.camera-fullscreen-stream')?.getAttribute('src')).toContain(`/test/full_${component.cameraPageSize}`);
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(fixture.debugElement.injector.get(CameraPlaybackService).getStreamUrl).toHaveBeenCalledWith(`camera.high_${component.cameraPageSize}`);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     expect(component.cameraMenuOpen).toBeFalse();
     const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));
     root.querySelector<HTMLButtonElement>('.camera-fullscreen-close')!.click();
@@ -196,7 +206,7 @@ describe('Room photo picker', () => {
     fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
-    expect(root.querySelector('.camera-fullscreen-stream')?.getAttribute('src')).toContain('/test/legacy');
+    expect(fixture.debugElement.injector.get(CameraPlaybackService).getStreamUrl).toHaveBeenCalledWith('camera.legacy');
     const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
     const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
@@ -210,18 +220,18 @@ describe('Room photo picker', () => {
     const { fixture, root, component } = createPicker();
     fixture.componentRef.setInput('cameras', [{ entityId: 'camera.front', name: 'Entrée', streamUrl: '/test-camera/front', available: true }]); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(1);
-    const streamImage = root.querySelector<HTMLImageElement>('.camera-visual img')!;
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(1);
+    const streamImage = root.querySelector<HTMLImageElement>('.camera-visual video')!;
     let requested = false;
     component.clockLongPress.subscribe(() => { requested = true; expect(component.cameraMenuOpen).toBeFalse(); });
     root.querySelector('.temperature')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); fixture.detectChanges();
     expect(requested).toBeTrue();
     expect(streamImage.hasAttribute('src')).toBeFalse();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     fixture.componentRef.setInput('mediaSuspended', true); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
     expect(component.cameraMenuOpen).toBeFalse();
-    expect(root.querySelectorAll('.camera-visual img').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     fixture.destroy();
   });
 
@@ -236,18 +246,20 @@ describe('Room photo picker', () => {
     await closed; fixture.detectChanges();
     expect(component.cameraMenuOpen).toBeFalse();
     expect(component.fullscreenCamera).toBeNull();
-    expect(root.querySelectorAll('.camera-visual img, .camera-fullscreen-stream').length).toBe(0);
+    expect(root.querySelectorAll('.camera-visual video, .camera-fullscreen-stream').length).toBe(0);
     fixture.destroy();
   });
 
-  it('explicitly cancels the sources of stream images removed by a page change', () => {
-    const { fixture, root, component } = createPicker();
+  it('explicitly cancels video players removed by a page change', async () => {
+    const { fixture, root, component, playback } = createPicker();
     fixture.componentRef.setInput('cameras', Array.from({ length: 12 }, (_, index) => ({ entityId: `camera.page_${index}`, name: `Caméra ${index}`, streamUrl: `/test-camera/${index}`, available: true }))); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
-    const previousImages = Array.from(root.querySelectorAll<HTMLImageElement>('.camera-visual img'));
+    await fixture.whenStable(); fixture.detectChanges();
+    const previousImages = Array.from(root.querySelectorAll<HTMLImageElement>('.camera-visual video'));
     component.changeCameraPage(1); fixture.detectChanges();
     expect(previousImages.every((image) => !image.hasAttribute('src'))).toBeTrue();
-    expect(root.querySelectorAll('.camera-visual img').length).toBeGreaterThan(0);
+    expect(playback.cleanup).toHaveBeenCalled();
+    expect(root.querySelectorAll('.camera-visual video').length).toBeGreaterThan(0);
     component.closeCameraMenu(); fixture.destroy();
   });
 

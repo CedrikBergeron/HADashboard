@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, Output, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, Output, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { CameraVideoComponent } from '../camera-video/camera-video.component';
 import { NavItem } from '../../models/NavItem';
 
 export interface CameraMenuItem {
   entityId: string;
   name: string;
-  streamUrl: string;
-  fullscreenStreamUrl?: string;
+  previewEntityId?: string;
+  fullscreenEntityId?: string;
   fullscreenAvailable?: boolean;
   available: boolean;
 }
@@ -26,7 +27,7 @@ export interface TopNavActionChip {
 @Component({
   selector: 'app-top-nav',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CameraVideoComponent],
   templateUrl: './top-nav.component.html',
   styleUrl: './top-nav.component.scss'
 })
@@ -58,6 +59,7 @@ export class TopNavComponent implements OnDestroy {
   @ViewChild('topBar', { static: true }) topBar!: ElementRef<HTMLElement>;
   @ViewChild('cameraDialog', { static: true }) cameraDialog!: ElementRef<HTMLElement>;
   @ViewChild('cameraTrigger', { static: true }) cameraTrigger!: ElementRef<HTMLButtonElement>;
+  @ViewChildren(CameraVideoComponent) cameraPlayers!: QueryList<CameraVideoComponent>;
   @ViewChild('cameraFullscreen', { static: true }) cameraFullscreen!: ElementRef<HTMLDialogElement>;
   private _cameras: CameraMenuItem[] = [];
   @Input() set cameras(value: CameraMenuItem[]) {
@@ -69,8 +71,6 @@ export class TopNavComponent implements OnDestroy {
   cameraPage = 0;
   cameraPageSize = window.innerWidth >= 768 ? 9 : 4;
   fullscreenCamera: CameraMenuItem | null = null;
-  fullscreenStreamFailed = false;
-  fullscreenRetryNonce = 0;
   private destroyed = false;
   private _mediaSuspended = false;
   private suppressFullscreenReturn = false;
@@ -94,8 +94,6 @@ export class TopNavComponent implements OnDestroy {
     this.clockLongPress.emit();
   }
   cameraMenuOpen = false;
-  readonly failedCameraStreams = new Set<string>();
-  readonly cameraRetryNonce: Record<string, number> = {};
   roomMenuTop = 104;
   @Input() roomBackgrounds: RoomMenuBackground[] = [];
   roomMenuOpen = false;
@@ -165,7 +163,6 @@ export class TopNavComponent implements OnDestroy {
     if (opening && this._mediaSuspended) { event.preventDefault(); return; }
     if (opening) {
       this.roomMenuTop = Math.ceil(this.topBar.nativeElement.getBoundingClientRect().bottom + 16);
-      this.failedCameraStreams.clear();
       this.closeRoomMenu();
     }
     if (!opening) this.stopCameraImages(this.cameraDialog.nativeElement);
@@ -175,13 +172,14 @@ export class TopNavComponent implements OnDestroy {
   private stopCameraImages(container: HTMLElement | undefined): void {
     // Removing an MJPEG <img> from the DOM alone can leave its connection running.
     container?.querySelectorAll<HTMLImageElement>('img').forEach((image) => image.removeAttribute('src'));
+    this.cameraPlayers?.forEach((player) => { if (container?.contains(player.element.nativeElement)) player.stop(); });
   }
 
   private stopRemovedCameraImages(): void {
     const retained = new Set(this.pagedCameras.map((camera) => camera.entityId));
-    this.cameraDialog?.nativeElement.querySelectorAll<HTMLImageElement>('.camera-visual img').forEach((image) => {
-      const id = image.closest('.camera-tile')?.getAttribute('data-camera-id');
-      if (!id || !retained.has(id)) image.removeAttribute('src');
+    this.cameraPlayers?.forEach((player) => {
+      const id = player.element.nativeElement.closest('.camera-tile')?.getAttribute('data-camera-id');
+      if (id && !retained.has(id)) player.stop();
     });
   }
 
@@ -212,8 +210,6 @@ export class TopNavComponent implements OnDestroy {
   openCameraFullscreen(camera: CameraMenuItem): void {
     if (this._mediaSuspended) return;
     this.fullscreenCamera = camera;
-    this.fullscreenStreamFailed = false;
-    this.fullscreenRetryNonce = 0;
     this.closeCameraMenu();
     this.cameraFullscreen.nativeElement.showModal();
   }
@@ -228,7 +224,6 @@ export class TopNavComponent implements OnDestroy {
     this.stopCameraImages(this.cameraFullscreen.nativeElement);
     const entityId = this.fullscreenCamera?.entityId;
     this.fullscreenCamera = null;
-    this.fullscreenStreamFailed = false;
     if (this.destroyed || this._mediaSuspended || this.suppressFullscreenReturn) {
       this.suppressFullscreenReturn = false;
       return;
@@ -241,16 +236,6 @@ export class TopNavComponent implements OnDestroy {
   cancelCameraFullscreen(event: Event): void {
     event.preventDefault();
     this.closeCameraFullscreen();
-  }
-
-  retryFullscreenStream(): void {
-    this.fullscreenStreamFailed = false;
-    this.fullscreenRetryNonce++;
-  }
-
-  retryCamera(entityId: string): void {
-    this.failedCameraStreams.delete(entityId);
-    this.cameraRetryNonce[entityId] = (this.cameraRetryNonce[entityId] || 0) + 1;
   }
 
   @HostListener('document:keydown.escape', ['$event'])

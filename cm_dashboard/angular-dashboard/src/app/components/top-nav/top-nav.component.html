@@ -104,14 +104,12 @@
           <article class="camera-tile" [attr.aria-label]="camera.name" [attr.data-camera-id]="camera.entityId">
             <div class="camera-visual">
               @if (cameraMenuOpen) {
-              @if (camera.available && !failedCameraStreams.has(camera.entityId)) {
-                <img [src]="camera.streamUrl + '?session=' + (cameraRetryNonce[camera.entityId] || 0)" [alt]="camera.name"
-                  (error)="failedCameraStreams.add(camera.entityId)">
+              @if (camera.available) {
+                <app-camera-video [entityId]="camera.previewEntityId || camera.entityId" [label]="camera.name"></app-camera-video>
                 <span class="camera-live"><i></i>Direct</span>
               } @else {
                 <div class="camera-stream-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span>
-                  <span>{{ camera.available ? 'Flux indisponible' : 'Caméra hors ligne' }}</span>
-                  @if (camera.available) { <button type="button" (click)="retryCamera(camera.entityId)">Réessayer</button> }
+                  <span>Caméra hors ligne</span>
                 </div>
               }
               }
@@ -133,10 +131,10 @@
 <dialog #cameraFullscreen class="camera-fullscreen" aria-labelledby="camera-fullscreen-title" (cancel)="cancelCameraFullscreen($event)" (close)="onCameraFullscreenClosed()">
   <header class="camera-fullscreen-toolbar"><div><span>Direct</span><h2 id="camera-fullscreen-title">{{ fullscreenCamera?.name }}</h2></div><button type="button" class="camera-fullscreen-close" (click)="closeCameraFullscreen()" aria-label="Retour aux caméras" autofocus><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
   @if (fullscreenCamera; as camera) {
-    @if ((camera.fullscreenAvailable ?? camera.available) && !fullscreenStreamFailed) {
-      <img class="camera-fullscreen-stream" [src]="(camera.fullscreenStreamUrl || camera.streamUrl) + '?session=' + fullscreenRetryNonce" [alt]="camera.name" (error)="fullscreenStreamFailed = true">
+    @if (camera.fullscreenAvailable ?? camera.available) {
+      <app-camera-video class="camera-fullscreen-stream" [entityId]="camera.fullscreenEntityId || camera.entityId" [label]="camera.name" [controls]="true" [lowLatency]="true"></app-camera-video>
     } @else {
-      <div class="camera-stream-error fullscreen-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><span>{{ (camera.fullscreenAvailable ?? camera.available) ? 'Flux indisponible' : 'Caméra hors ligne' }}</span>@if (camera.fullscreenAvailable ?? camera.available) { <button type="button" (click)="retryFullscreenStream()">Réessayer</button> }</div>
+      <div class="camera-stream-error fullscreen-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><span>Caméra hors ligne</span></div>
     }
   }
 </dialog>

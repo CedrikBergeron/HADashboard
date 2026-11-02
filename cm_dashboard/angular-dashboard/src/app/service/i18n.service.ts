@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import type { DashboardLanguage } from './dashboard-api.service';
 
 const ENGLISH_PHRASES: Array<[string, string]> = [
+  ['Connexion au flux vidéo…', 'Connecting to video…'], ['Flux vidéo indisponible', 'Video stream unavailable'],
   ['Aucune caméra configurée.', 'No cameras configured.'], ['Ajoutez vos caméras dans l’administration, section Sécurité vidéo.', 'Add your cameras in the administration under Video security.'], ['La vérification a expiré. Réessayez.', 'Verification timed out. Please try again.'],
   ['Caméra principale', 'Primary camera'], ['Flux du menu', 'Menu stream'], ['Flux plein écran', 'Fullscreen stream'], ['Utiliser la caméra principale', 'Use primary camera'], ['Aucun flux personnalisé', 'No custom stream'], ['Retour aux caméras', 'Back to cameras'], ['Caméras précédentes', 'Previous cameras'], ['Caméras suivantes', 'Next cameras'],
   ['Choisissez par exemple le flux basse résolution pour le menu et le flux haute résolution pour le plein écran. Sans sélection, la caméra principale est utilisée.', 'For example, choose the low-resolution stream for the menu and the high-resolution stream for fullscreen. The primary camera is used when no override is selected.'],

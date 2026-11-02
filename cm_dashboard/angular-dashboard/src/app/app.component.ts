@@ -216,8 +216,8 @@ export class HomeDashboardComponent implements OnInit, OnDestroy {
       const previewId = camera?.previewEntityId || entityId;
       const fullscreenId = camera?.fullscreenEntityId || entityId;
       return {
-        entityId, name, streamUrl: this.dashboardApi.cameraStreamUrl(previewId), available: available(previewId),
-        fullscreenStreamUrl: this.dashboardApi.cameraStreamUrl(fullscreenId), fullscreenAvailable: available(fullscreenId)
+        entityId, name, previewEntityId: previewId, fullscreenEntityId: fullscreenId, available: available(previewId),
+        fullscreenAvailable: available(fullscreenId)
       };
     });
   }

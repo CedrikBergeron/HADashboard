@@ -158,6 +158,13 @@ export class DashboardApiService {
     return url.startsWith('/uploads/') && location.port === '4200' ? `${this.devServerOrigin}${url}` : url;
   }
 
+  cameraHlsProxyUrl(path: string): string {
+    if (!/^\/api\/hls\/[a-zA-Z0-9_./-]+(?:\?[^#]*)?$/.test(path) || path.split('?')[0].split('/').some((segment) => segment === '..' || segment === '.')) {
+      throw new Error('Invalid Home Assistant stream URL.');
+    }
+    return `${this.baseUrl}/home-assistant/hls/${path.slice('/api/hls/'.length)}`;
+  }
+
   cameraStreamUrl(entityId: string): string {
     return `${this.cameraSnapshotUrl(entityId)}/stream`;
   }

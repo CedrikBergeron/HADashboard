@@ -497,3 +497,5 @@
 .camera-tile { width: min(100%, calc((100cqh - 20px) * 16 / 27)); aspect-ratio: 16 / 9; box-sizing: border-box; }
 .camera-visual { position: absolute; inset: 0; height: 100%; }
 @media (max-width: 767px) { .camera-tile { width: min(100%, calc((100cqh - 10px) * 8 / 9)); } }
+
+.camera-visual app-camera-video { position:absolute; inset:0; }

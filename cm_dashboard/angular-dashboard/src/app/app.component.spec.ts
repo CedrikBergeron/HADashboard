@@ -62,8 +62,8 @@ describe('Camera stream choices', () => {
     state.latestEntities = { 'camera.front_low': { entity_id: 'camera.front_low', state: 'unavailable', attributes: {} }, 'camera.front_high': { entity_id: 'camera.front_high', state: 'idle', attributes: {} } };
     expect(component.cameraMenuItems.length).toBe(1);
     const camera = component.cameraMenuItems.find((entry) => entry.entityId === 'camera.front')!;
-    expect(camera.streamUrl).toBe('/stream/camera.front_low');
-    expect(camera.fullscreenStreamUrl).toBe('/stream/camera.front_high');
+    expect(camera.previewEntityId).toBe('camera.front_low');
+    expect(camera.fullscreenEntityId).toBe('camera.front_high');
     expect(camera.available).toBeFalse();
     expect(camera.fullscreenAvailable).toBeTrue();
   });

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { configurationStore, ConfigurationError } from './configurations.mjs';
 import { proxyCameraStream } from './camera-stream.mjs';
+import { proxyCameraHls } from './camera-hls.mjs';
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)));
 const dataDir = process.env.DASHBOARD_DATA_DIR || join(root, 'data');
@@ -283,6 +284,11 @@ async function api(req, res, url) {
   }
   const device = await deviceAccess(req);
   if (!device.allowed) return json(res, 401, { error: 'Appareil non autorisé', code: 'DEVICE_UNAUTHORIZED' });
+  if (url.pathname.startsWith('/api/home-assistant/hls/') && ['GET', 'HEAD'].includes(req.method)) {
+    const secret = await hassSecret();
+    if (!secret) return json(res, 503, { error: 'Home Assistant non configuré' });
+    return proxyCameraHls(req, res, url, secret);
+  }
   const streamMatch = url.pathname.match(/^\/api\/home-assistant\/camera\/(camera\.[a-zA-Z0-9_]+)\/stream$/);
   if (streamMatch && req.method === 'GET') {
     const secret = await hassSecret();

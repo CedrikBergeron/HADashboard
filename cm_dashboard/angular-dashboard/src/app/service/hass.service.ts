@@ -300,7 +300,11 @@ export class HassService {
     this.cacheTimeoutId = setTimeout(() => { this.cacheTimeoutId = null; this.saveCache('entities', this.entitiesSubject.value); }, 1000);
   }
 
-  private sendCommand<T>(payload: Record<string, any>): Promise<T> {
+  getCameraHlsStream(entityId: string): Promise<{ url: string }> {
+    return this.sendCommand<{ url: string }>({ type: 'camera/stream', entity_id: entityId, format: 'hls' }, 15000);
+  }
+
+  private sendCommand<T>(payload: Record<string, any>, timeoutMs?: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error('Home Assistant WebSocket is not connected.'));
@@ -308,9 +312,13 @@ export class HassService {
       }
 
       const id = this.nextId++;
+      const timer = timeoutMs ? setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error('Home Assistant command timed out.'));
+      }, timeoutMs) : undefined;
       this.pendingRequests.set(id, {
-        resolve: (value) => resolve(value as T),
-        reject
+        resolve: (value) => { if (timer) clearTimeout(timer); resolve(value as T); },
+        reject: (error) => { if (timer) clearTimeout(timer); reject(error); }
       });
       this.ws.send(
         JSON.stringify({
