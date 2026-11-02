@@ -1,6 +1,6 @@
 {
   "name": "angular-dashboard",
-  "version": "1.4.31",
+  "version": "1.4.33",
   "scripts": {
     "ng": "ng",
     "start": "node ../server/dev.mjs",

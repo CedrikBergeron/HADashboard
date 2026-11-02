@@ -5,6 +5,7 @@ import { TopNavComponent } from './top-nav.component';
 describe('Room photo picker', () => {
   function createPicker() {
     const playback = {
+      attachWebRtc: jasmine.createSpy('attachWebRtc').and.rejectWith(new Error('Test HLS fallback')),
       getStreamUrl: jasmine.createSpy('getStreamUrl').and.resolveTo('/test/master.m3u8'),
       cleanup: jasmine.createSpy('cleanup'),
       attach: jasmine.createSpy('attach')
@@ -186,6 +187,8 @@ describe('Room photo picker', () => {
     root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
     const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
     expect(fullscreen.open).toBeTrue();
+    await fixture.whenStable();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(fixture.debugElement.injector.get(CameraPlaybackService).getStreamUrl).toHaveBeenCalledWith(`camera.high_${component.cameraPageSize}`);
     expect(root.querySelectorAll('.camera-visual video').length).toBe(0);
     expect(component.cameraMenuOpen).toBeFalse();
@@ -206,6 +209,8 @@ describe('Room photo picker', () => {
     fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-chip')!.click(); fixture.detectChanges();
     root.querySelector<HTMLButtonElement>('.camera-expand')!.click(); fixture.detectChanges();
+    await fixture.whenStable();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
     expect(fixture.debugElement.injector.get(CameraPlaybackService).getStreamUrl).toHaveBeenCalledWith('camera.legacy');
     const fullscreen = root.querySelector<HTMLDialogElement>('.camera-fullscreen')!;
     const closed = new Promise<void>((resolve) => fullscreen.addEventListener('close', () => resolve(), { once: true }));

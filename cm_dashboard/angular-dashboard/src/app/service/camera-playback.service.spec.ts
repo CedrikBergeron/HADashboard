@@ -23,6 +23,12 @@ describe('Camera video playback', () => {
     const load = spyOn(video, 'load');
     const dispose = await service.attach(video, '/api/home-assistant/hls/session/master.m3u8', () => {}, new AbortController().signal, false);
     expect(video.getAttribute('src')).toContain('/api/home-assistant/hls/session/master.m3u8');
+    expect(video.controls).toBeFalse();
+    expect(video.autoplay).toBeTrue();
+    expect(video.muted).toBeTrue();
+    expect(video.defaultMuted).toBeTrue();
+    expect(video.playsInline).toBeTrue();
+    expect(video.play).toHaveBeenCalled();
     dispose();
     expect(pause).toHaveBeenCalled(); expect(load).toHaveBeenCalled();
     expect(video.hasAttribute('src')).toBeFalse();
@@ -35,4 +41,16 @@ describe('Camera video playback', () => {
     await expectAsync(service.attach(video, '/unused', () => {}, controller.signal, false)).toBeRejected();
     expect(video.hasAttribute('src')).toBeFalse();
   });
+  it('reuses a recently negotiated stream and forces a fresh URL for retries', async () => {
+    const hass = { getCameraHlsStream: jasmine.createSpy().and.resolveTo({ url: '/api/hls/session/master.m3u8' }) };
+    const api = new DashboardApiService({} as never);
+    const service = new CameraPlaybackService(hass as unknown as HassService, api);
+    await Promise.all([service.getStreamUrl('camera.front'), service.getStreamUrl('camera.front')]);
+    expect(hass.getCameraHlsStream).toHaveBeenCalledTimes(1);
+    await service.getStreamUrl('camera.front');
+    expect(hass.getCameraHlsStream).toHaveBeenCalledTimes(1);
+    await service.getStreamUrl('camera.front', true);
+    expect(hass.getCameraHlsStream).toHaveBeenCalledTimes(2);
+  });
+
 });

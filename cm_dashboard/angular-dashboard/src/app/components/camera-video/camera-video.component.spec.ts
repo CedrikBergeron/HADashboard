@@ -24,3 +24,25 @@ describe('Camera video lifecycle', () => {
     fixture.destroy(); expect(cleanup).toHaveBeenCalled(); expect(signal.aborted).toBeTrue();
   });
 });
+
+
+describe('Preferred camera transport', () => {
+  it('prefers WebRTC and switches to HLS if the established peer fails', async () => {
+    let failPeer!: () => void;
+    const cleanup = jasmine.createSpy('cleanup');
+    const playback = {
+      attachWebRtc: jasmine.createSpy().and.callFake(async (_video, _id, onFatal) => { failPeer = onFatal; return cleanup; }),
+      getStreamUrl: jasmine.createSpy().and.resolveTo('/playlist.m3u8'),
+      attach: jasmine.createSpy().and.resolveTo(() => {})
+    };
+    TestBed.configureTestingModule({ imports: [CameraVideoComponent], providers: [{ provide: CameraPlaybackService, useValue: playback }] });
+    const fixture = TestBed.createComponent(CameraVideoComponent); fixture.componentRef.setInput('entityId', 'camera.front_high'); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.componentInstance.transport).toBe('webrtc'); expect(playback.getStreamUrl).not.toHaveBeenCalled();
+    failPeer(); await fixture.whenStable();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(cleanup).toHaveBeenCalled(); expect(playback.attachWebRtc).toHaveBeenCalledTimes(1);
+    expect(playback.getStreamUrl).toHaveBeenCalledWith('camera.front_high', true);
+    expect(fixture.componentInstance.transport).toBe('hls');
+    fixture.destroy();
+  });
+});

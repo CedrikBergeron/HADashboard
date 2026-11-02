@@ -132,7 +132,7 @@
   <header class="camera-fullscreen-toolbar"><div><span>Direct</span><h2 id="camera-fullscreen-title">{{ fullscreenCamera?.name }}</h2></div><button type="button" class="camera-fullscreen-close" (click)="closeCameraFullscreen()" aria-label="Retour aux caméras" autofocus><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>
   @if (fullscreenCamera; as camera) {
     @if (camera.fullscreenAvailable ?? camera.available) {
-      <app-camera-video class="camera-fullscreen-stream" [entityId]="camera.fullscreenEntityId || camera.entityId" [label]="camera.name" [controls]="true" [lowLatency]="true"></app-camera-video>
+      <app-camera-video class="camera-fullscreen-stream" [entityId]="camera.fullscreenEntityId || camera.entityId" [label]="camera.name" [fit]="'contain'" [lowLatency]="true"></app-camera-video>
     } @else {
       <div class="camera-stream-error fullscreen-error" role="status"><span class="material-symbols-outlined" aria-hidden="true">videocam_off</span><span>Caméra hors ligne</span></div>
     }

@@ -42,6 +42,12 @@ export interface HassEntityState {
 
 export type HassServiceCatalog = Record<string, Record<string, unknown>>;
 
+export type CameraWebRtcEvent =
+  | { type: 'session'; session_id: string }
+  | { type: 'answer'; answer: string }
+  | { type: 'candidate'; candidate: RTCIceCandidateInit }
+  | { type: 'error'; code: string; message: string };
+
 interface HassEvent {
   event_type: string;
   data: HassStateChangedEvent;
@@ -50,7 +56,7 @@ interface HassEvent {
 interface HassMessage {
   type: string;
   id?: number;
-  event?: HassEvent;
+  event?: HassEvent | CameraWebRtcEvent;
   success?: boolean;
   result?: any;
   error?: any;
@@ -83,6 +89,7 @@ export class HassService {
   readonly services$ = this.servicesSubject.asObservable();
   readonly connected$ = this.connectedSubject.asObservable();
 
+  private readonly cameraSubscriptions = new Map<number, (event: CameraWebRtcEvent) => void>();
   private readonly pendingRequests = new Map<number, HassPendingRequest>();
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private nextId = 1;
@@ -210,9 +217,8 @@ export class HassService {
         this.resolvePendingRequest(message);
         break;
       case 'event':
-        if (message.event?.event_type === 'state_changed') {
-          this.applyStateChange(message.event.data);
-        }
+        if (message.id && this.cameraSubscriptions.has(message.id)) this.cameraSubscriptions.get(message.id)!(message.event as CameraWebRtcEvent);
+        else if (message.event && 'event_type' in message.event && message.event.event_type === 'state_changed') this.applyStateChange(message.event.data);
         break;
       default:
         break;
@@ -300,6 +306,48 @@ export class HassService {
     this.cacheTimeoutId = setTimeout(() => { this.cacheTimeoutId = null; this.saveCache('entities', this.entitiesSubject.value); }, 1000);
   }
 
+  getCameraCapabilities(entityId: string): Promise<{ frontend_stream_types: string[] }> {
+    return this.sendCommand({ type: 'camera/capabilities', entity_id: entityId }, 3000);
+  }
+
+  getCameraWebRtcConfig(entityId: string): Promise<{ configuration: RTCConfiguration; dataChannel?: string }> {
+    return this.sendCommand({ type: 'camera/webrtc/get_client_config', entity_id: entityId }, 3000);
+  }
+
+  sendCameraIceCandidate(entityId: string, sessionId: string, candidate: RTCIceCandidateInit): Promise<void> {
+    return this.sendCommand({ type: 'camera/webrtc/candidate', entity_id: entityId, session_id: sessionId, candidate }, 5000);
+  }
+
+  subscribeCameraWebRtc(entityId: string, offer: string, listener: (event: CameraWebRtcEvent) => void, signal: AbortSignal): Promise<() => void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted || !this.ws || this.ws.readyState !== WebSocket.OPEN) { reject(new Error('Camera signalling unavailable')); return; }
+      const id = this.nextId++;
+      let acknowledged = false;
+      let disposed = false;
+      const dispose = () => {
+        if (disposed) return;
+        disposed = true;
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        this.cameraSubscriptions.delete(id);
+        this.pendingRequests.delete(id);
+        if (this.ws?.readyState === WebSocket.OPEN) void this.sendCommand({ type: 'unsubscribe_events', subscription: id }, 3000).catch(() => {});
+      };
+      const abort = () => { dispose(); if (!acknowledged) reject(new DOMException('Camera cancelled', 'AbortError')); };
+      const timer = setTimeout(() => { dispose(); reject(new Error('Camera signalling timed out')); }, 5000);
+      this.cameraSubscriptions.set(id, listener);
+      this.pendingRequests.set(id, {
+        resolve: () => {
+          if (disposed) return;
+          acknowledged = true; clearTimeout(timer); resolve(dispose);
+        },
+        reject: (error) => { dispose(); reject(error); }
+      });
+      signal.addEventListener('abort', abort, { once: true });
+      this.ws.send(JSON.stringify({ id, type: 'camera/webrtc/offer', entity_id: entityId, offer }));
+    });
+  }
+
   getCameraHlsStream(entityId: string): Promise<{ url: string }> {
     return this.sendCommand<{ url: string }>({ type: 'camera/stream', entity_id: entityId, format: 'hls' }, 15000);
   }
@@ -350,6 +398,9 @@ export class HassService {
   }
 
   private rejectPendingRequests(reason: unknown): void {
+    const listeners = [...this.cameraSubscriptions.values()];
+    this.cameraSubscriptions.clear();
+    for (const listener of listeners) listener({ type: 'error', code: 'connection_closed', message: 'Camera signalling disconnected' });
     for (const [requestId, pendingRequest] of this.pendingRequests.entries()) {
       pendingRequest.reject(reason);
       this.pendingRequests.delete(requestId);

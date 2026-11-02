@@ -1,13 +1,13 @@
-import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostBinding, Input, OnChanges, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CameraPlaybackService } from '../../service/camera-playback.service';
 
 @Component({
   selector: 'app-camera-video', standalone: true,
   template: `
-    <video #video autoplay [muted]="true" playsinline [controls]="controls" [attr.aria-label]="label"
-      [style.object-fit]="controls ? 'contain' : 'cover'" (playing)="onPlaying()" (waiting)="onWaiting()" (error)="onVideoError()"></video>
+    <video #video autoplay [muted]="true" playsinline preload="auto" [controls]="false" [attr.aria-label]="label"
+      [style.object-fit]="fit" (playing)="onPlaying()" (waiting)="onWaiting()" (error)="onVideoError()"></video>
     @if (state === 'loading') { <div class="video-loading" role="status"><span class="video-spinner"></span><span>Connexion au flux vidéo…</span></div> }
-    @if (state === 'error') { <div class="camera-video-error" role="status"><span class="material-symbols-outlined">videocam_off</span><span>Flux vidéo indisponible</span><button type="button" (click)="$event.stopPropagation(); start()">Réessayer</button></div> }
+    @if (state === 'error') { <div class="camera-video-error" role="status"><span class="material-symbols-outlined">videocam_off</span><span>Flux vidéo indisponible</span><button type="button" (click)="$event.stopPropagation(); start(true)">Réessayer</button></div> }
   `,
   styles: [`
     :host { display:block; position:relative; width:100%; height:100%; background:#090b0d; }
@@ -24,9 +24,10 @@ import { CameraPlaybackService } from '../../service/camera-playback.service';
 export class CameraVideoComponent implements OnInit, OnChanges, OnDestroy {
   @Input() entityId = '';
   @Input() label = '';
-  @Input() controls = false;
+  @Input() fit: 'cover' | 'contain' = 'cover';
   @Input() lowLatency = false;
   @ViewChild('video', { static: true }) video!: ElementRef<HTMLVideoElement>;
+  @HostBinding('attr.data-transport') transport: 'webrtc' | 'hls' | null = null;
   state: 'loading' | 'playing' | 'error' = 'loading';
   private initialized = false;
   private generation = 0;
@@ -38,22 +39,33 @@ export class CameraVideoComponent implements OnInit, OnChanges, OnDestroy {
   ngOnChanges(): void { if (this.initialized) void this.start(); }
   ngOnDestroy(): void { this.stop(); }
 
-  async start(): Promise<void> {
+  async start(refresh = false, hlsOnly = false): Promise<void> {
     this.stop();
     const generation = this.generation;
     const controller = this.controller = new AbortController();
     this.state = 'loading';
     try {
-      const url = await this.playback.getStreamUrl(this.entityId);
+      if (!hlsOnly) {
+        try {
+          const cleanup = await this.playback.attachWebRtc(this.video.nativeElement, this.entityId, () => {
+            if (generation === this.generation && !controller.signal.aborted) void this.start(true, true);
+          }, controller.signal);
+          if (controller.signal.aborted || generation !== this.generation) cleanup();
+          else { this.cleanup = cleanup; this.transport = 'webrtc'; }
+          return;
+        } catch { if (controller.signal.aborted || generation !== this.generation) return; }
+      }
+      const url = await (refresh ? this.playback.getStreamUrl(this.entityId, true) : this.playback.getStreamUrl(this.entityId));
       if (controller.signal.aborted || generation !== this.generation) return;
       const cleanup = await this.playback.attach(this.video.nativeElement, url, () => this.fail(generation), controller.signal, this.lowLatency);
       if (controller.signal.aborted || generation !== this.generation) cleanup();
-      else this.cleanup = cleanup;
+      else { this.cleanup = cleanup; this.transport = 'hls'; }
     } catch { if (!controller.signal.aborted && generation === this.generation) this.fail(generation); }
   }
 
   stop(): void {
     this.generation++;
+    this.transport = null;
     this.controller?.abort();
     this.cleanup?.();
     this.cleanup = undefined;
